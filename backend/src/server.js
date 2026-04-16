@@ -2,7 +2,7 @@ require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
 const { errorHandler, notFound } = require('./middlewares/errorHandler')
-const productRoutes = require('./modules/products/product.routes')
+const productRoutes = require('./modules/products/routes')
 
 const app = express()
 const PORT = process.env.PORT || 3000

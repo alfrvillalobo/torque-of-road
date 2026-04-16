@@ -1,4 +1,4 @@
-const ProductRepository = require('./product.repository')
+const ProductRepository = require('./repository')
  
 // Genera un slug limpio desde el nombre del producto
 function generateSlug(name) {

@@ -1,5 +1,5 @@
 const QuoteRepository = require('./quote.repository')
-const ProductRepository = require('../products/product.repository')
+const ProductRepository = require('../products/repository')
 
 const VALID_STATUSES = ['pending', 'reviewed', 'approved', 'rejected']
 

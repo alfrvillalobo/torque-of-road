@@ -99,18 +99,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* CTA WhatsApp */}
-      <section style={{ background: '#111', color: '#fff', padding: '4rem 1.5rem', textAlign: 'center' }}>
-        <h2 style={{ margin: '0 0 12px', fontSize: 22, fontWeight: 700 }}>¿No encuentras lo que buscas?</h2>
-        <p style={{ color: '#aaa', marginBottom: 24, fontSize: 15 }}>Escríbenos directamente y te asesoramos según tu camioneta.</p>
-        <a href="https://wa.me/56973841370" target="_blank" rel="noreferrer" style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          background: '#25d366', color: '#fff', textDecoration: 'none',
-          padding: '0.875rem 1.75rem', borderRadius: 8, fontWeight: 600, fontSize: 15,
-        }}>
-          Escribir por WhatsApp
-        </a>
-      </section>
+      
     </div>
   )
 }

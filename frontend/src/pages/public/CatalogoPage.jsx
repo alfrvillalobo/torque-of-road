@@ -1,27 +1,50 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ShoppingCart, Search, SlidersHorizontal } from 'lucide-react'
+import { ShoppingCart, Search, SlidersHorizontal, Check } from 'lucide-react'
 import { useProducts, useCategories } from '../../hooks/useProducts'
 import { useCartStore } from '../../context/cartStore'
 import { formatCLP } from '../../utils/format'
-import toast from 'react-hot-toast'
 
-function ProductCard({ product }) {
+// Botón con estado de confirmación visual integrado en la card
+function AddToCartButton({ product }) {
   const addItem = useCartStore((s) => s.addItem)
+  const [added, setAdded] = useState(false)
 
   const handleAdd = (e) => {
-    e.preventDefault()
+    e.preventDefault()  // evita navegar al producto
+    e.stopPropagation()
     addItem(product)
-    toast.success(`${product.name} agregado a cotización`)
+    setAdded(true)
+    // Vuelve al estado normal después de 2 segundos
+    setTimeout(() => setAdded(false), 2000)
   }
 
   return (
-    <Link to={`/producto/${product.slug}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-      <div style={{
-        background: '#fff', borderRadius: 10, border: '1px solid #eee',
-        overflow: 'hidden', transition: 'box-shadow 0.2s',
-        cursor: 'pointer',
+    <button
+      onClick={handleAdd}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 5,
+        background: added ? '#16a34a' : '#111',
+        color: '#fff', border: 'none', borderRadius: 6,
+        padding: '7px 12px', fontSize: 13, fontWeight: 500,
+        cursor: 'pointer', transition: 'background 0.25s',
+        whiteSpace: 'nowrap', flexShrink: 0,
       }}
+    >
+      {added ? <Check size={14} /> : <ShoppingCart size={14} />}
+      {added ? '¡Agregado!' : 'Cotizar'}
+    </button>
+  )
+}
+
+function ProductCard({ product }) {
+  return (
+    <Link to={`/producto/${product.slug}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+      <div
+        style={{
+          background: '#fff', borderRadius: 10, border: '1px solid #eee',
+          overflow: 'hidden', transition: 'box-shadow 0.2s', cursor: 'pointer',
+        }}
         onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08)'}
         onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
       >
@@ -35,7 +58,6 @@ function ProductCard({ product }) {
               Sin imagen
             </div>
           )}
-          {/* Badge stock */}
           <span style={{
             position: 'absolute', top: 10, right: 10,
             background: product.stock_status === 'disponible' ? '#22c55e' : '#f97316',
@@ -53,17 +75,14 @@ function ProductCard({ product }) {
               {product.brand}
             </p>
           )}
-          <p style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>{product.name}</p>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#111' }}>{formatCLP(product.price)}</p>
-            <button onClick={handleAdd} style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              background: '#111', color: '#fff', border: 'none',
-              borderRadius: 6, padding: '6px 12px', fontSize: 13,
-              fontWeight: 500, cursor: 'pointer',
-            }}>
-              <ShoppingCart size={14} /> Cotizar
-            </button>
+          <p style={{ margin: '0 0 10px', fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
+            {product.name}
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#111' }}>
+              {formatCLP(product.price)}
+            </p>
+            <AddToCartButton product={product} />
           </div>
         </div>
       </div>
@@ -80,10 +99,11 @@ export default function CatalogoPage() {
 
   const { data: products = [], isLoading } = useProducts({
     category: category || undefined,
-    make: make || undefined,
-    model: model || undefined,
+    make:     make     || undefined,
+    model:    model    || undefined,
   })
   const { data: categories = [] } = useCategories()
+  const cartCount = useCartStore((s) => s.count)
 
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -100,25 +120,56 @@ export default function CatalogoPage() {
         </p>
       </div>
 
+      {/* Banner flotante del carrito — aparece cuando hay items */}
+      {cartCount > 0 && (
+        <div style={{
+          background: '#111', color: '#fff', borderRadius: 10,
+          padding: '0.875rem 1.25rem', marginBottom: '1.5rem',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              background: '#f97316', borderRadius: '50%',
+              width: 28, height: 28, display: 'flex',
+              alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <ShoppingCart size={14} color="#fff" />
+            </div>
+            <span style={{ fontSize: 14 }}>
+              Tienes <strong>{cartCount} producto{cartCount !== 1 ? 's' : ''}</strong> en tu cotización
+            </span>
+          </div>
+          <Link to="/cotizar" style={{
+            background: '#f97316', color: '#fff', textDecoration: 'none',
+            padding: '0.45rem 1rem', borderRadius: 6, fontSize: 13,
+            fontWeight: 600, whiteSpace: 'nowrap',
+          }}>
+            Ver cotización →
+          </Link>
+        </div>
+      )}
+
       {/* Barra de búsqueda y filtros */}
       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
           <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#aaa' }} />
-          <input value={search} onChange={(e) => setSearch(e.target.value)}
+          <input
+            value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar producto o marca..."
-            style={{ width: '100%', padding: '0.65rem 0.75rem 0.65rem 2.25rem', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none' }} />
+            style={{ width: '100%', padding: '0.65rem 0.75rem 0.65rem 2.25rem', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none' }}
+          />
         </div>
-
         <select value={category} onChange={(e) => setCategory(e.target.value)}
           style={{ padding: '0.65rem 0.75rem', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, background: '#fff', outline: 'none' }}>
           <option value="">Todas las categorías</option>
           {categories.map((c) => <option key={c.id} value={c.slug}>{c.name}</option>)}
         </select>
-
         <button onClick={() => setShowFilters(!showFilters)} style={{
           display: 'flex', alignItems: 'center', gap: 6,
           padding: '0.65rem 1rem', border: '1px solid #ddd', borderRadius: 8,
-          background: showFilters ? '#111' : '#fff', color: showFilters ? '#fff' : '#333',
+          background: showFilters ? '#111' : '#fff',
+          color: showFilters ? '#fff' : '#333',
           fontSize: 14, cursor: 'pointer',
         }}>
           <SlidersHorizontal size={15} /> Filtrar por vehículo
@@ -153,15 +204,16 @@ export default function CatalogoPage() {
         </div>
       )}
 
-      {/* Resultados */}
+      {/* Contador de resultados */}
       <p style={{ fontSize: 13, color: '#888', marginBottom: '1rem' }}>
         {isLoading ? 'Cargando...' : `${filtered.length} producto${filtered.length !== 1 ? 's' : ''}`}
       </p>
 
+      {/* Grid de productos */}
       {isLoading ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1.25rem' }}>
           {[...Array(6)].map((_, i) => (
-            <div key={i} style={{ background: '#f5f5f5', borderRadius: 10, height: 320, animation: 'pulse 1.5s infinite' }} />
+            <div key={i} style={{ background: '#f5f5f5', borderRadius: 10, height: 320 }} />
           ))}
         </div>
       ) : filtered.length === 0 ? (

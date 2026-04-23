@@ -12,6 +12,7 @@ const orderRoutes        = require('./modules/orders/order.routes')
 const supplierRoutes     = require('./modules/suppliers/supplier.routes')
 const availabilityRoutes = require('./modules/availability/availability.routes')
 const shipmentRoutes     = require('./modules/shipments/shipment.routes')
+const uploadRoutes       = require('./modules/uploads/upload.routes')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -32,6 +33,7 @@ app.use('/api/orders',        orderRoutes)
 app.use('/api/suppliers',     supplierRoutes)
 app.use('/api/availability',  availabilityRoutes)
 app.use('/api/shipments',     shipmentRoutes)
+app.use('/api/uploads',       uploadRoutes)
 
 app.use(notFound)
 app.use(errorHandler)

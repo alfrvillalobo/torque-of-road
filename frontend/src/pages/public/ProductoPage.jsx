@@ -1,27 +1,33 @@
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ShoppingCart, ArrowLeft, CheckCircle } from 'lucide-react'
+import { ShoppingCart, ArrowLeft, CheckCircle, Check } from 'lucide-react'
 import { useProductBySlug } from '../../hooks/useProducts'
 import { useCartStore } from '../../context/cartStore'
 import { formatCLP } from '../../utils/format'
-import toast from 'react-hot-toast'
 
 export default function ProductoPage() {
   const { slug } = useParams()
   const { data: product, isLoading, error } = useProductBySlug(slug)
-  const addItem = useCartStore((s) => s.addItem)
+  const addItem   = useCartStore((s) => s.addItem)
+  const cartCount = useCartStore((s) => s.count)
+  const [added, setAdded] = useState(false)
 
-  if (isLoading) return <div style={{ padding: '4rem', textAlign: 'center', color: '#888' }}>Cargando...</div>
+  const handleAdd = () => {
+    addItem(product)
+    setAdded(true)
+    setTimeout(() => setAdded(false), 3000)
+  }
+
+  if (isLoading) return (
+    <div style={{ padding: '4rem', textAlign: 'center', color: '#888' }}>Cargando...</div>
+  )
+
   if (error || !product) return (
     <div style={{ padding: '4rem', textAlign: 'center' }}>
       <p style={{ color: '#888' }}>Producto no encontrado.</p>
       <Link to="/catalogo" style={{ color: '#f97316' }}>Volver al catálogo</Link>
     </div>
   )
-
-  const handleAdd = () => {
-    addItem(product)
-    toast.success('Agregado a tu cotización')
-  }
 
   const mainImage = product.images?.[0]?.url || null
 
@@ -31,6 +37,29 @@ export default function ProductoPage() {
       <Link to="/catalogo" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#888', textDecoration: 'none', fontSize: 14, marginBottom: '1.5rem' }}>
         <ArrowLeft size={15} /> Volver al catálogo
       </Link>
+
+      {/* Banner carrito — aparece si ya hay items */}
+      {cartCount > 0 && (
+        <div style={{
+          background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8,
+          padding: '0.75rem 1rem', marginBottom: '1.5rem',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ShoppingCart size={16} color="#16a34a" />
+            <span style={{ fontSize: 14, color: '#15803d' }}>
+              Tienes <strong>{cartCount} producto{cartCount !== 1 ? 's' : ''}</strong> guardados en tu cotización
+            </span>
+          </div>
+          <Link to="/cotizar" style={{
+            background: '#16a34a', color: '#fff', textDecoration: 'none',
+            padding: '0.4rem 0.875rem', borderRadius: 6, fontSize: 13,
+            fontWeight: 600, whiteSpace: 'nowrap',
+          }}>
+            Ver cotización →
+          </Link>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem' }}>
         {/* Imagen */}
@@ -52,7 +81,7 @@ export default function ProductoPage() {
 
           {product.sku && <p style={{ margin: '0 0 16px', fontSize: 13, color: '#aaa' }}>SKU: {product.sku}</p>}
 
-          <p style={{ margin: '0 0 24px', fontSize: 30, fontWeight: 800, color: '#111' }}>{formatCLP(product.price)}</p>
+          <p style={{ margin: '0 0 20px', fontSize: 30, fontWeight: 800, color: '#111' }}>{formatCLP(product.price)}</p>
 
           {/* Disponibilidad */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1.5rem' }}>
@@ -61,7 +90,9 @@ export default function ProductoPage() {
               background: product.stock_status === 'disponible' ? '#22c55e' : '#f97316',
             }} />
             <span style={{ fontSize: 14, color: '#555' }}>
-              {product.stock_status === 'disponible' ? 'Disponible para despacho inmediato' : 'Disponible bajo pedido · 3-7 días hábiles'}
+              {product.stock_status === 'disponible'
+                ? 'Disponible para despacho inmediato'
+                : 'Disponible bajo pedido · 3-7 días hábiles'}
             </span>
           </div>
 
@@ -86,18 +117,51 @@ export default function ProductoPage() {
             </div>
           )}
 
-          {/* Botón */}
-          <button onClick={handleAdd} style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            width: '100%', background: '#111', color: '#fff', border: 'none',
-            borderRadius: 10, padding: '1rem', fontSize: 16, fontWeight: 600, cursor: 'pointer',
-          }}>
-            <ShoppingCart size={18} /> Agregar a cotización
+          {/* Botón con feedback de confirmación */}
+          <button
+            onClick={handleAdd}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              width: '100%', border: 'none', borderRadius: 10, padding: '1rem',
+              fontSize: 16, fontWeight: 600, cursor: 'pointer',
+              background: added ? '#16a34a' : '#111',
+              color: '#fff', transition: 'background 0.25s',
+            }}
+          >
+            {added ? <Check size={20} /> : <ShoppingCart size={20} />}
+            {added ? '¡Agregado a tu cotización!' : 'Agregar a cotización'}
           </button>
 
+          {/* Mensaje de acción posterior — aparece solo al agregar */}
+          {added && (
+            <div style={{
+              marginTop: '0.875rem', background: '#f0fdf4',
+              border: '1px solid #bbf7d0', borderRadius: 8,
+              padding: '0.75rem 1rem', display: 'flex',
+              alignItems: 'center', justifyContent: 'space-between', gap: 12,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <CheckCircle size={16} color="#16a34a" />
+                <span style={{ fontSize: 14, color: '#15803d' }}>
+                  Producto guardado en tu cotización
+                </span>
+              </div>
+              <Link to="/cotizar" style={{
+                color: '#16a34a', fontWeight: 600, fontSize: 13,
+                textDecoration: 'none', whiteSpace: 'nowrap',
+              }}>
+                Ir a cotizar →
+              </Link>
+            </div>
+          )}
+
           {/* Garantías */}
-          <div style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {['Asesoría personalizada incluida', 'Envíos a todo Chile', 'Instalación coordinada disponible'].map((item) => (
+          <div style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[
+              'Asesoría personalizada incluida',
+              'Envíos a todo Chile',
+              'Instalación coordinada disponible',
+            ].map((item) => (
               <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#555' }}>
                 <CheckCircle size={14} color="#22c55e" /> {item}
               </div>

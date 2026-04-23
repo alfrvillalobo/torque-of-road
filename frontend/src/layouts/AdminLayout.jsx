@@ -9,7 +9,6 @@ const navItems = [
   { to: '/admin/categorias',   icon: Layers,          label: 'Categorías' },
   { to: '/admin/cotizaciones', icon: FileText,        label: 'Cotizaciones' },
   { to: '/admin/pedidos',      icon: ShoppingBag,     label: 'Pedidos' },
-  { to: '/admin/distribuidores', icon: Truck,         label: 'Distribuidores' },
 ]
 
 export default function AdminLayout() {

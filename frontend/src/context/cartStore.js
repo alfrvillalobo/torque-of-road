@@ -1,8 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-// El carrito acá no es de compra directa — es de cotización.
-// El cliente arma su lista y la envía como solicitud de presupuesto.
 export const useCartStore = create(
   persist(
     (set, get) => ({
@@ -14,9 +12,7 @@ export const useCartStore = create(
         if (existing) {
           set({
             items: items.map((i) =>
-              i.id === product.id
-                ? { ...i, quantity: i.quantity + 1 }
-                : i
+              i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i
             ),
           })
         } else {
@@ -28,7 +24,10 @@ export const useCartStore = create(
         set({ items: get().items.filter((i) => i.id !== productId) }),
 
       updateQuantity: (productId, quantity) => {
-        if (quantity <= 0) return get().removeItem(productId)
+        if (quantity <= 0) {
+          get().removeItem(productId)
+          return
+        }
         set({
           items: get().items.map((i) =>
             i.id === productId ? { ...i, quantity } : i
@@ -37,15 +36,16 @@ export const useCartStore = create(
       },
 
       clear: () => set({ items: [] }),
-
-      // Totales calculados
-      get total() {
-        return get().items.reduce((acc, i) => acc + i.price * i.quantity, 0)
-      },
-      get count() {
-        return get().items.reduce((acc, i) => acc + i.quantity, 0)
-      },
     }),
     { name: 'torque-cart' }
   )
 )
+
+// Selectores derivados — se usan así en los componentes:
+// const count = useCartStore(selectCount)
+// const total = useCartStore(selectTotal)
+export const selectCount = (state) =>
+  state.items.reduce((acc, i) => acc + i.quantity, 0)
+
+export const selectTotal = (state) =>
+  state.items.reduce((acc, i) => acc + i.price * i.quantity, 0)

@@ -176,7 +176,7 @@ export default function NosotrosPage() {
           <Link to="/catalogo" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#f97316', color: '#fff', textDecoration: 'none', padding: '0.875rem 1.75rem', borderRadius: 8, fontWeight: 600, fontSize: 15 }}>
             Ver catálogo <ArrowRight size={16} />
           </Link>
-          <a href="https://wa.me/56973841370" target="_blank" rel="noreferrer"
+          <a href="https://wa.me/56973841370?text=Hola,%20estoy%20interesado%20en%20cotizar%20algunos%20productos%20de%20Torque%20Off%20Road.%20¿Me%20pueden%20ayudar?" target="_blank" rel="noreferrer"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'transparent', color: '#fff', textDecoration: 'none', padding: '0.875rem 1.75rem', borderRadius: 8, fontWeight: 500, fontSize: 15, border: '1px solid #444' }}>
             Escribir por WhatsApp
           </a>

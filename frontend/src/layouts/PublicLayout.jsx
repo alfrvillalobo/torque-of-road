@@ -1,9 +1,8 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { ShoppingCart, Menu, X, Truck, Phone, Mail, MapPin } from 'lucide-react'
 import { useState } from 'react'
-import { useCartStore } from '../context/cartStore'
+import { useCartStore, selectCount } from '../context/cartStore'
 
-// SVG de Facebook e Instagram inline para evitar dependencia de versión de lucide
 function FacebookIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -24,24 +23,22 @@ function InstagramIcon() {
 
 export default function PublicLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
-  const count = useCartStore((s) => s.count)
+  const count    = useCartStore(selectCount)   // selector derivado, reactivo
   const { pathname } = useLocation()
 
   const navLinks = [
     { to: '/',         label: 'Inicio' },
     { to: '/catalogo', label: 'Catálogo' },
     { to: '/nosotros', label: 'Nosotros' },
-    { to: '/contacto', label: 'Contacto' },
   ]
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
 
-      {/* ── Navbar ────────────────────────────────────────────── */}
+      {/* ── Navbar ─────────────────────────────────────────── */}
       <header style={{ position: 'sticky', top: 0, zIndex: 50, background: '#111', borderBottom: '1px solid #1f1f1f' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
 
-          {/* Logo */}
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
             <Truck size={24} color="#f97316" />
             <span style={{ color: '#fff', fontWeight: 700, fontSize: 18, letterSpacing: '-0.5px' }}>
@@ -49,13 +46,11 @@ export default function PublicLayout() {
             </span>
           </Link>
 
-          {/* Nav desktop */}
           <nav className="desktop-nav" style={{ display: 'flex', gap: '2rem' }}>
             {navLinks.map((l) => (
               <Link key={l.to} to={l.to} style={{
                 color: pathname === l.to ? '#f97316' : '#aaa',
                 textDecoration: 'none', fontSize: 15, fontWeight: 500,
-                transition: 'color 0.15s',
                 borderBottom: pathname === l.to ? '2px solid #f97316' : '2px solid transparent',
                 paddingBottom: 2,
               }}>
@@ -64,9 +59,8 @@ export default function PublicLayout() {
             ))}
           </nav>
 
-          {/* Carrito + hamburguesa */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <Link to="/cotizar" style={{ position: 'relative', color: '#aaa', display: 'flex', alignItems: 'center', padding: 4 }}>
+            <Link to="/cotizar" style={{ position: 'relative', color: '#aaa', display: 'flex', alignItems: 'center', padding: 4, textDecoration: 'none' }}>
               <ShoppingCart size={22} />
               {count > 0 && (
                 <span style={{
@@ -90,7 +84,6 @@ export default function PublicLayout() {
           </div>
         </div>
 
-        {/* Menú móvil */}
         {menuOpen && (
           <div style={{ background: '#111', borderTop: '1px solid #1f1f1f', padding: '0.5rem 1.5rem 1rem' }}>
             {navLinks.map((l) => (
@@ -107,32 +100,28 @@ export default function PublicLayout() {
         )}
       </header>
 
-      {/* ── Contenido ─────────────────────────────────────────── */}
       <main style={{ flex: 1 }}>
         <Outlet />
       </main>
 
-      {/* ── Footer profesional ────────────────────────────────── */}
+      {/* ── Footer ─────────────────────────────────────────── */}
       <footer style={{ background: '#0a0a0a', borderTop: '1px solid #1f1f1f', marginTop: 'auto' }}>
 
-        {/* Franja naranja CTA */}
         <div style={{ background: '#f97316', padding: '1.25rem 1.5rem' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <p style={{ margin: 0, color: '#fff', fontWeight: 700, fontSize: 16 }}>¿Listo para transformar tu camioneta?</p>
               <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.85)', fontSize: 13 }}>Escríbenos y te asesoramos sin costo</p>
             </div>
-            <a href="https://wa.me/56973841370" target="_blank" rel="noreferrer"
+            <a href="https://wa.me/56973841370?text=Hola,%20estoy%20interesado%20en%20cotizar%20algunos%20productos%20de%20Torque%20Off%20Road.%20¿Me%20pueden%20ayudar?" target="_blank" rel="noreferrer"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', color: '#f97316', padding: '0.6rem 1.25rem', borderRadius: 8, fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
               Contactar por WhatsApp
             </a>
           </div>
         </div>
 
-        {/* Cuerpo del footer — 4 columnas */}
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '3rem 1.5rem 2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '2.5rem' }}>
 
-          {/* Columna 1: marca */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
               <Truck size={20} color="#f97316" />
@@ -155,7 +144,6 @@ export default function PublicLayout() {
             </div>
           </div>
 
-          {/* Columna 2: navegación */}
           <div>
             <p style={{ color: '#fff', fontWeight: 600, fontSize: 13, margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: 1 }}>Navegación</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -176,7 +164,6 @@ export default function PublicLayout() {
             </div>
           </div>
 
-          {/* Columna 3: servicios */}
           <div>
             <p style={{ color: '#fff', fontWeight: 600, fontSize: 13, margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: 1 }}>Servicios</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -186,7 +173,6 @@ export default function PublicLayout() {
             </div>
           </div>
 
-          {/* Columna 4: contacto */}
           <div>
             <p style={{ color: '#fff', fontWeight: 600, fontSize: 13, margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: 1 }}>Contacto</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -207,15 +193,10 @@ export default function PublicLayout() {
           </div>
         </div>
 
-        {/* Línea inferior */}
         <div style={{ borderTop: '1px solid #1a1a1a', padding: '1.25rem 1.5rem' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-            <p style={{ margin: 0, color: '#444', fontSize: 13 }}>
-              © {new Date().getFullYear()} Torque Off Road. Todos los derechos reservados.
-            </p>
-            <p style={{ margin: 0, color: '#444', fontSize: 13 }}>
-              Hecho con pasión por el 4×4 🛻
-            </p>
+            <p style={{ margin: 0, color: '#444', fontSize: 13 }}>© {new Date().getFullYear()} Torque Off Road. Todos los derechos reservados.</p>
+            <p style={{ margin: 0, color: '#444', fontSize: 13 }}>Hecho con pasión por el 4×4 🛻</p>
           </div>
         </div>
       </footer>
@@ -225,13 +206,8 @@ export default function PublicLayout() {
           from { transform: scale(0.5); opacity: 0; }
           to   { transform: scale(1);   opacity: 1; }
         }
-        @media (min-width: 768px) {
-          .mobile-menu-btn { display: none !important; }
-        }
-        @media (max-width: 767px) {
-          .desktop-nav { display: none !important; }
-          .mobile-menu-btn { display: flex !important; }
-        }
+        @media (min-width: 768px) { .mobile-menu-btn { display: none !important; } }
+        @media (max-width: 767px) { .desktop-nav { display: none !important; } .mobile-menu-btn { display: flex !important; } }
       `}</style>
     </div>
   )

@@ -59,10 +59,10 @@ export default function HomePage() {
       {/* Features */}
       <section style={{ maxWidth: 1000, margin: '0 auto', padding: '4rem 1.5rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-          <FeatureCard icon={Wrench}  title="Asesoría personalizada" desc="Recomendamos según tu modelo de camioneta y tipo de uso." />
-          <FeatureCard icon={Shield}  title="Productos de calidad" desc="Marcas reconocidas: Dobinsons, Bilstein, Old Man Emu y más." />
-          <FeatureCard icon={Truck}   title="Envíos a todo Chile" desc="Despachamos desde Santiago a cualquier región del país." />
-          <FeatureCard icon={Phone}   title="Atención directa" desc="Habla directamente con Cristóbal vía WhatsApp o teléfono." />
+          <FeatureCard icon={Wrench} title="Asesoría personalizada" desc="Recomendamos según tu modelo de camioneta y tipo de uso." />
+          <FeatureCard icon={Shield} title="Productos de calidad" desc="Marcas reconocidas: Dobinsons, Bilstein, Old Man Emu y más." />
+          <FeatureCard icon={Truck} title="Envíos a todo Chile" desc="Despachamos desde Santiago a cualquier región del país." />
+          <FeatureCard icon={Phone} title="Atención directa" desc="Habla directamente con Cristóbal vía WhatsApp o teléfono." />
         </div>
       </section>
 
@@ -79,18 +79,96 @@ export default function HomePage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1.25rem' }}>
               {featured.map((p) => (
                 <Link key={p.id} to={`/producto/${p.slug}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                  <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', overflow: 'hidden' }}>
-                    <div style={{ aspectRatio: '4/3', background: '#eee', overflow: 'hidden' }}>
-                      {p.main_image
-                        ? <img src={p.main_image} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb', fontSize: 13 }}>Sin imagen</div>
-                      }
+                  <div
+                    style={{
+                      background: '#fff',
+                      borderRadius: 10,
+                      border: '1px solid #eee',
+                      overflow: 'hidden',
+                      transition: 'box-shadow 0.2s',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08)'}
+                    onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
+                  >
+
+                    {/* Imagen */}
+                    <div style={{
+                      height: 200,
+                      background: '#f8f8f6',
+                      position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '1rem'
+                    }}>
+                      {p.main_image ? (
+                        <img
+                          src={p.main_image}
+                          alt={p.name}
+                          style={{
+                            maxWidth: '100%',
+                            maxHeight: '100%',
+                            objectFit: 'contain'
+                          }}
+                        />
+                      ) : (
+                        <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center' }}>
+                          Sin imagen
+                        </div>
+                      )}
+
+                      {/* Badge */}
+                      <span style={{
+                        position: 'absolute',
+                        top: 10,
+                        right: 10,
+                        background: p.stock_status === 'disponible' ? '#22c55e' : '#f97316',
+                        color: '#fff',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        padding: '2px 8px',
+                        borderRadius: 20
+                      }}>
+                        {p.stock_status === 'disponible' ? 'Disponible' : 'Bajo pedido'}
+                      </span>
                     </div>
+
+                    {/* Info */}
                     <div style={{ padding: '1rem' }}>
-                      {p.brand && <p style={{ margin: '0 0 4px', fontSize: 11, color: '#f97316', fontWeight: 600, textTransform: 'uppercase' }}>{p.brand}</p>}
-                      <p style={{ margin: '0 0 6px', fontWeight: 600, fontSize: 14 }}>{p.name}</p>
-                      <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>{formatCLP(p.price)}</p>
+                      {p.brand && (
+                        <p style={{
+                          margin: '0 0 4px',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: '#f97316',
+                          textTransform: 'uppercase',
+                          letterSpacing: 1
+                        }}>
+                          {p.brand}
+                        </p>
+                      )}
+
+                      <p style={{
+                        margin: '0 0 10px',
+                        fontSize: 15,
+                        fontWeight: 600,
+                        lineHeight: 1.3,
+                        minHeight: 40
+                      }}>
+                        {p.name}
+                      </p>
+
+                      <p style={{
+                        margin: 0,
+                        fontSize: 18,
+                        fontWeight: 700,
+                        color: '#111'
+                      }}>
+                        {formatCLP(p.price)}
+                      </p>
                     </div>
+
                   </div>
                 </Link>
               ))}
@@ -99,7 +177,7 @@ export default function HomePage() {
         </section>
       )}
 
-      
+
     </div>
   )
 }

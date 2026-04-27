@@ -1,6 +1,6 @@
 import { useForm } from 'react-hook-form'
 import { useMutation } from '@tanstack/react-query'
-import { Trash2, ShoppingCart, CheckCircle, Wrench } from 'lucide-react'
+import { Trash2, ShoppingCart, CheckCircle, Wrench, AlertCircle } from 'lucide-react'
 import { useCartStore, selectCount, selectTotal } from '../../context/cartStore'
 import { quoteService } from '../../services/index'
 import { formatCLP } from '../../utils/format'
@@ -9,8 +9,10 @@ import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
 export default function CotizarPage() {
-  const [sent, setSent]               = useState(false)
+  const [sent, setSent]                 = useState(false)
   const [wantsInstall, setWantsInstall] = useState(false)
+  // Fix #9: guardar lista de productos con problemas para mostrarlos al usuario
+  const [unavailableProducts, setUnavailableProducts] = useState([])
 
   const items          = useCartStore((s) => s.items)
   const removeItem     = useCartStore((s) => s.removeItem)
@@ -23,14 +25,12 @@ export default function CotizarPage() {
 
   const submit = useMutation({
     mutationFn: (data) => {
-      // Construir el campo notes incluyendo info de instalación si aplica
       let notes = data.notes || ''
       if (wantsInstall) {
         notes += `\n\n--- Solicita instalación ---`
         if (data.install_address) notes += `\nDirección: ${data.install_address}`
         if (data.install_date)    notes += `\nFecha preferida: ${data.install_date}`
       }
-
       return quoteService.create({
         customer_name:  data.name,
         customer_email: data.email,
@@ -42,8 +42,28 @@ export default function CotizarPage() {
         items: items.map((i) => ({ product_id: i.id, quantity: i.quantity })),
       })
     },
-    onSuccess: () => { clear(); setSent(true) },
-    onError: (e) => toast.error(e.response?.data?.error || 'Error al enviar cotización'),
+    onSuccess: () => {
+      setUnavailableProducts([])
+      clear()
+      setSent(true)
+    },
+    onError: (err) => {
+      const message = err.response?.data?.error || 'Error al enviar cotización'
+
+      // Fix #9: si el backend devuelve productos no disponibles, mostrarlos claramente
+      // en la UI en lugar de un toast genérico que el usuario puede ignorar
+      if (err.response?.data?.error?.includes('no están disponibles')) {
+        // Extraer los nombres de la lista del mensaje de error del backend
+        const match = message.match(/: (.+)\. Por favor/)
+        if (match) {
+          const names = match[1].split(', ').map((n) => n.replace(/^"|"$/g, ''))
+          setUnavailableProducts(names)
+        }
+        toast.error('Algunos productos ya no están disponibles. Revisa tu cotización.')
+      } else {
+        toast.error(message)
+      }
+    },
   })
 
   const inputStyle = (hasError) => ({
@@ -80,11 +100,34 @@ export default function CotizarPage() {
     <div style={{ maxWidth: 1000, margin: '0 auto', padding: '2rem 1.5rem' }}>
       <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: '2rem' }}>Solicitar cotización</h1>
 
+      {/* Fix #9: bloque de error visible cuando hay productos no disponibles */}
+      {unavailableProducts.length > 0 && (
+        <div style={{
+          background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10,
+          padding: '1rem 1.25rem', marginBottom: '1.5rem',
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+        }}>
+          <AlertCircle size={18} color="#ef4444" style={{ flexShrink: 0, marginTop: 2 }} />
+          <div>
+            <p style={{ margin: '0 0 6px', fontWeight: 600, fontSize: 14, color: '#991b1b' }}>
+              Los siguientes productos ya no están disponibles:
+            </p>
+            <ul style={{ margin: '0 0 8px', paddingLeft: 18 }}>
+              {unavailableProducts.map((name, i) => (
+                <li key={i} style={{ fontSize: 13, color: '#b91c1c', marginBottom: 2 }}>{name}</li>
+              ))}
+            </ul>
+            <p style={{ margin: 0, fontSize: 13, color: '#991b1b' }}>
+              Retíralos de tu cotización para continuar.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '2.5rem', alignItems: 'start' }}>
 
         {/* ── Formulario ── */}
         <form onSubmit={handleSubmit((d) => submit.mutate(d))} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Tus datos</h3>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -118,20 +161,26 @@ export default function CotizarPage() {
               <input {...register('vehicle_model')} placeholder="Hilux, Ranger..." style={inputStyle(false)} />
             </div>
             <div>
+              {/* Fix #8: año con validación de rango en el frontend también */}
               <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 4 }}>Año</label>
-              <input type="number" {...register('vehicle_year')} placeholder="2020" style={inputStyle(false)} />
+              <input
+                type="number"
+                {...register('vehicle_year', {
+                  min: { value: 1980, message: 'Año mínimo 1980' },
+                  max: { value: new Date().getFullYear() + 1, message: `Año máximo ${new Date().getFullYear() + 1}` },
+                })}
+                placeholder="2022"
+                style={inputStyle(errors.vehicle_year)}
+              />
+              {errors.vehicle_year && <p style={{ color: '#ef4444', fontSize: 11, marginTop: 2 }}>{errors.vehicle_year.message}</p>}
             </div>
           </div>
 
-          {/* ── Opción de instalación ── */}
+          {/* Opción de instalación */}
           <div style={{ background: wantsInstall ? '#fff7ed' : '#f8f8f6', border: `1px solid ${wantsInstall ? '#fed7aa' : '#eee'}`, borderRadius: 8, padding: '1rem', transition: 'all 0.2s' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
-              <input
-                type="checkbox"
-                checked={wantsInstall}
-                onChange={(e) => setWantsInstall(e.target.checked)}
-                style={{ width: 16, height: 16, accentColor: '#f97316', cursor: 'pointer' }}
-              />
+              <input type="checkbox" checked={wantsInstall} onChange={(e) => setWantsInstall(e.target.checked)}
+                style={{ width: 16, height: 16, accentColor: '#f97316', cursor: 'pointer' }} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Wrench size={16} color={wantsInstall ? '#f97316' : '#888'} />
                 <span style={{ fontWeight: 600, fontSize: 14, color: wantsInstall ? '#c2410c' : '#333' }}>
@@ -142,6 +191,19 @@ export default function CotizarPage() {
             <p style={{ margin: '6px 0 0 26px', fontSize: 12, color: '#888' }}>
               Coordinamos la instalación con un técnico especializado. Se agrega al presupuesto.
             </p>
+            {wantsInstall && (
+              <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 4 }}>Dirección de instalación</label>
+                  <input {...register('install_address')} placeholder="Ej: Av. Principal 123, Santiago" style={inputStyle(false)} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 4 }}>Fecha preferida</label>
+                  <input type="date" {...register('install_date')}
+                    min={new Date().toISOString().split('T')[0]} style={inputStyle(false)} />
+                </div>
+              </div>
+            )}
           </div>
 
           <div>
@@ -167,27 +229,46 @@ export default function CotizarPage() {
           </h3>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
-            {items.map((item) => (
-              <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</p>
-                  <p style={{ margin: 0, fontSize: 12, color: '#888' }}>{formatCLP(item.price)} c/u</p>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <button onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                      style={{ width: 24, height: 24, border: '1px solid #ddd', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 14 }}>-</button>
-                    <span style={{ minWidth: 20, textAlign: 'center', fontSize: 13 }}>{item.quantity}</span>
-                    <button onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      style={{ width: 24, height: 24, border: '1px solid #ddd', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 14 }}>+</button>
+            {items.map((item) => {
+              // Fix #9: marcar visualmente los productos no disponibles en el carrito
+              const isUnavailable = unavailableProducts.some(
+                (name) => name.toLowerCase() === item.name.toLowerCase()
+              )
+              return (
+                <div key={item.id} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  opacity: isUnavailable ? 0.6 : 1,
+                  background: isUnavailable ? '#fef2f2' : 'transparent',
+                  borderRadius: isUnavailable ? 6 : 0,
+                  padding: isUnavailable ? '4px 6px' : 0,
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isUnavailable ? '#ef4444' : 'inherit' }}>
+                      {item.name}
+                      {isUnavailable && ' ⚠️'}
+                    </p>
+                    <p style={{ margin: 0, fontSize: 12, color: isUnavailable ? '#ef4444' : '#888' }}>
+                      {isUnavailable ? 'No disponible' : `${formatCLP(item.price)} c/u`}
+                    </p>
                   </div>
-                  <button onClick={() => removeItem(item.id)}
-                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0 }}>
-                    <Trash2 size={14} />
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 12 }}>
+                    {!isUnavailable && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <button onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          style={{ width: 24, height: 24, border: '1px solid #ddd', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 14 }}>-</button>
+                        <span style={{ minWidth: 20, textAlign: 'center', fontSize: 13 }}>{item.quantity}</span>
+                        <button onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          style={{ width: 24, height: 24, border: '1px solid #ddd', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 14 }}>+</button>
+                      </div>
+                    )}
+                    <button onClick={() => removeItem(item.id)}
+                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0 }}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           {wantsInstall && (
@@ -201,8 +282,10 @@ export default function CotizarPage() {
             <span>Total estimado</span>
             <span>{formatCLP(total)}</span>
           </div>
+
+          {/* Fix #10: aviso de que el precio final lo confirma el backend */}
           <p style={{ margin: '8px 0 0', fontSize: 12, color: '#888' }}>
-            * El precio final puede variar según disponibilidad{wantsInstall ? ' e instalación' : ''}.
+            * Los precios se confirman al enviar. El total final puede variar si algún precio fue actualizado{wantsInstall ? ' o por el costo de instalación' : ''}.
           </p>
         </div>
       </div>

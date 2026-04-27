@@ -1,6 +1,6 @@
 require('dotenv').config()
 const express = require('express')
-const cors = require('cors')
+const cors    = require('cors')
 const { errorHandler, notFound } = require('./middlewares/errorHandler')
 
 const authRoutes         = require('./modules/auth/auth.routes')
@@ -14,10 +14,16 @@ const availabilityRoutes = require('./modules/availability/availability.routes')
 const shipmentRoutes     = require('./modules/shipments/shipment.routes')
 const uploadRoutes       = require('./modules/uploads/upload.routes')
 
-const app = express()
+const app  = express()
 const PORT = process.env.PORT || 3000
 
-app.use(cors())
+// Fix #2: CORS restringido — solo acepta requests del frontend
+// En producción agregar FRONTEND_URL al .env con la URL real del sitio
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true,
+}))
+
 app.use(express.json())
 
 app.get('/api/health', (req, res) => {

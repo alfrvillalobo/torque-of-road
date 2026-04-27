@@ -11,7 +11,6 @@ import { productService } from '../../services/productService'
 import { formatCLP, formatDateTime, getStatusLabel } from '../../utils/format'
 import toast from 'react-hot-toast'
 
-// ── Utilidades ────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const { label, color } = getStatusLabel(status)
   const colors = { amber: '#f97316', blue: '#3b82f6', green: '#22c55e', red: '#ef4444', purple: '#a855f7', teal: '#14b8a6', gray: '#888' }
@@ -50,37 +49,26 @@ function StatCard({ icon: Icon, label, value, sub, color, to }) {
   return to ? <Link to={to} style={{ textDecoration: 'none' }}>{content}</Link> : content
 }
 
-// ── Modal cotización: aprobar = aprobar + crear pedido en un paso ──
+// ── Modal cotización: Fix #5 — un solo clic aprueba + crea pedido en el backend ──
 function QuickQuoteModal({ quote, onClose }) {
   const qc = useQueryClient()
 
-  // Rechazar — solo cambia el estado
   const reject = useMutation({
     mutationFn: () => quoteService.updateStatus(quote.id, 'rejected'),
     onSuccess: () => {
       toast.success('Cotización rechazada')
       qc.invalidateQueries({ queryKey: ['quotes'] })
-      qc.invalidateQueries({ queryKey: ['orders'] })
       onClose()
     },
-    onError: (e) => toast.error(e.response?.data?.error || 'Error'),
+    onError: (e) => toast.error(e.response?.data?.error || 'Error al rechazar'),
   })
 
-  // Aprobar y crear pedido — dos llamadas encadenadas en una sola acción
+  // Fix #5: llama al endpoint del backend que hace ambas cosas en una transacción
+  // Si el backend falla en cualquier paso hace rollback — no queda en estado inconsistente
   const approveAndConvert = useMutation({
-    mutationFn: async () => {
-      // 1. Aprobar la cotización
-      await quoteService.updateStatus(quote.id, 'approved')
-      // 2. Convertir en pedido inmediatamente
-      return orderService.createFromQuote(quote.id, {
-        customer_name:  quote.customer_name,
-        customer_email: quote.customer_email,
-        customer_phone: quote.customer_phone,
-      })
-    },
+    mutationFn: () => quoteService.approveAndConvert(quote.id),
     onSuccess: () => {
       toast.success('✅ Cotización aprobada y pedido creado')
-      // Invalidar ambas queries para que ambas secciones del dashboard se actualicen
       qc.invalidateQueries({ queryKey: ['quotes'] })
       qc.invalidateQueries({ queryKey: ['orders'] })
       onClose()
@@ -109,7 +97,6 @@ function QuickQuoteModal({ quote, onClose }) {
           </button>
         </div>
 
-        {/* Cliente */}
         <div style={{ background: '#f8f8f6', borderRadius: 8, padding: '0.875rem', marginBottom: '1rem' }}>
           <p style={{ margin: '0 0 2px', fontWeight: 600, fontSize: 14 }}>{quote.customer_name}</p>
           <p style={{ margin: '0 0 2px', fontSize: 13, color: '#666' }}>{quote.customer_email}</p>
@@ -121,7 +108,6 @@ function QuickQuoteModal({ quote, onClose }) {
           )}
         </div>
 
-        {/* Instalación */}
         {wantsInstall && (
           <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '0.75rem', marginBottom: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -134,7 +120,6 @@ function QuickQuoteModal({ quote, onClose }) {
           </div>
         )}
 
-        {/* Observaciones */}
         {cleanNotes && (
           <div style={{ background: '#f8f8f6', borderRadius: 8, padding: '0.75rem', marginBottom: '1rem' }}>
             <p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 600, color: '#888', textTransform: 'uppercase' }}>Observaciones</p>
@@ -142,7 +127,6 @@ function QuickQuoteModal({ quote, onClose }) {
           </div>
         )}
 
-        {/* Productos */}
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0.875rem' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #eee' }}>
@@ -166,9 +150,8 @@ function QuickQuoteModal({ quote, onClose }) {
           Total: {formatCLP(quote.total)}
         </div>
 
-        {/* Aviso de lo que hace el botón aprobar */}
         <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1.25rem', fontSize: 13, color: '#15803d' }}>
-          <strong>Al aprobar</strong>, la cotización se marcará como aprobada y se creará el pedido automáticamente en un solo paso.
+          <strong>Al aprobar</strong>, la cotización se marcará como aprobada y el pedido se creará automáticamente. Si algo falla, ningún cambio queda guardado.
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
@@ -191,7 +174,6 @@ function QuickQuoteModal({ quote, onClose }) {
   )
 }
 
-// ── Modal pedido: gestionar estado ────────────────────────────
 function QuickOrderModal({ order, onClose }) {
   const qc = useQueryClient()
   const STATUSES = ['pending', 'confirmed', 'in_progress', 'shipped', 'delivered', 'cancelled']
@@ -276,7 +258,6 @@ function QuickOrderModal({ order, onClose }) {
   )
 }
 
-// ── Dashboard principal ───────────────────────────────────────
 export default function DashboardPage() {
   const [quickQuote, setQuickQuote] = useState(null)
   const [quickOrder, setQuickOrder] = useState(null)
@@ -290,7 +271,7 @@ export default function DashboardPage() {
   const pendingQuotes    = quotes.filter((q) => q.status === 'pending')
   const activeOrders     = orders.filter((o) => !['delivered', 'cancelled'].includes(o.status))
 
-  const revenueThisMonth = ordersThisMonth
+  const revenueThisMonth  = ordersThisMonth
     .filter((o) => o.status === 'delivered')
     .reduce((acc, o) => acc + o.total, 0)
 
@@ -299,19 +280,17 @@ export default function DashboardPage() {
     ? Math.round((approvedThisMonth / quotesThisMonth.length) * 100)
     : 0
 
-  const now      = new Date()
+  const now       = new Date()
   const monthName = now.toLocaleString('es-CL', { month: 'long' })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
 
-      {/* Saludo */}
       <div>
         <h2 style={{ margin: '0 0 2px', fontSize: 20, fontWeight: 700 }}>Buenos días, Cristóbal 👋</h2>
         <p style={{ margin: 0, color: '#888', fontSize: 14 }}>Resumen de {monthName} {now.getFullYear()}</p>
       </div>
 
-      {/* Alerta de cotizaciones pendientes */}
       {pendingQuotes.length > 0 && (
         <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '0.875rem 1.25rem', display: 'flex', alignItems: 'center', gap: 10 }}>
           <AlertCircle size={18} color="#f97316" style={{ flexShrink: 0 }} />
@@ -324,7 +303,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Métricas del mes */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '1rem' }}>
         <StatCard icon={FileText}    label="Cotizaciones este mes" value={quotesThisMonth.length}      sub={`${pendingQuotes.length} pendientes`} color="#3b82f6" to="/admin/cotizaciones" />
         <StatCard icon={ShoppingBag} label="Pedidos este mes"      value={ordersThisMonth.length}      sub={`${activeOrders.length} en proceso`}  color="#a855f7" to="/admin/pedidos" />
@@ -332,10 +310,7 @@ export default function DashboardPage() {
         <StatCard icon={Package}     label="Tasa de conversión"    value={`${conversionRate}%`}        sub="cotización → aprobada"                 color="#f97316" />
       </div>
 
-      {/* Fila principal: pendientes + activos */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-
-        {/* Cotizaciones pendientes */}
         <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', overflow: 'hidden' }}>
           <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Cotizaciones pendientes</h3>
@@ -368,7 +343,6 @@ export default function DashboardPage() {
           })}
         </div>
 
-        {/* Pedidos en proceso */}
         <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', overflow: 'hidden' }}>
           <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Pedidos en proceso</h3>
@@ -397,9 +371,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Fila inferior: historial del mes */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-
         <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', overflow: 'hidden' }}>
           <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #eee' }}>
             <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Cotizaciones de {monthName}</h3>

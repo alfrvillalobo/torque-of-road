@@ -1,19 +1,26 @@
 const bcrypt = require('bcryptjs')
-const jwt = require('jsonwebtoken')
+const jwt    = require('jsonwebtoken')
 const UserRepository = require('./user.repository')
 
-const JWT_SECRET = process.env.JWT_SECRET
+// Fix #3: JWT_EXPIRES puede vivir en scope de módulo (no cambia en runtime)
+// pero JWT_SECRET se lee dentro de signToken para evitar que sea undefined
+// si dotenv aún no cargó cuando Node importó este módulo
 const JWT_EXPIRES = process.env.JWT_EXPIRES || '7d'
 
 function signToken(user) {
+  const secret = process.env.JWT_SECRET
+  if (!secret) throw new Error('JWT_SECRET no está configurado en las variables de entorno')
   return jwt.sign(
     { id: user.id, email: user.email, role: user.role },
-    JWT_SECRET,
+    secret,
     { expiresIn: JWT_EXPIRES }
   )
 }
 
 const AuthService = {
+  // Fix #4: register ahora requiere que quien llame tenga rol admin.
+  // La validación de permisos se hace en la ruta (requireAuth + requireAdmin),
+  // pero aquí bloqueamos explícitamente cualquier intento de auto-asignarse rol admin
   async register({ name, email, password }) {
     if (!name || name.trim().length < 2) {
       const err = new Error('El nombre debe tener al menos 2 caracteres')
@@ -33,7 +40,9 @@ const AuthService = {
     }
 
     const hashed = await bcrypt.hash(password, 12)
-    const user = await UserRepository.create({ name: name.trim(), email, password: hashed })
+    // El role siempre se fuerza a 'user' aquí — el único admin
+    // se crea directamente en DB o via script seguro
+    const user = await UserRepository.create({ name: name.trim(), email, password: hashed, role: 'user' })
     return { user, token: signToken(user) }
   },
 

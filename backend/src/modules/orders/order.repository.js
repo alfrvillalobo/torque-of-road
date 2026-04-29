@@ -1,12 +1,18 @@
 const pool = require('../../config/db')
 
 const OrderRepository = {
-  async findAll({ status, user_id } = {}) {
+  async findAll({ status, user_id, month } = {}) {
     const conditions = []
     const values = []
     let i = 1
+
     if (status)  { conditions.push(`o.status = $${i++}`);  values.push(status) }
     if (user_id) { conditions.push(`o.user_id = $${i++}`); values.push(user_id) }
+    if (month) {
+      conditions.push(`TO_CHAR(o.created_at, 'YYYY-MM') = $${i++}`)
+      values.push(month)
+    }
+
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
     const { rows } = await pool.query(`
@@ -57,8 +63,7 @@ const OrderRepository = {
       await client.query('BEGIN')
 
       const subtotal = items.reduce((acc, i) => acc + i.subtotal, 0)
-      // installation_cost se actualizará si se vincula instalación
-      const total = subtotal
+      const total    = subtotal
 
       const { rows } = await client.query(
         `INSERT INTO orders

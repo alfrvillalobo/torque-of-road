@@ -1,12 +1,18 @@
 const pool = require('../../config/db')
 
 const QuoteRepository = {
-  async findAll({ status, user_id } = {}) {
+  async findAll({ status, user_id, month } = {}) {
     const conditions = []
     const values = []
     let i = 1
+
     if (status)  { conditions.push(`q.status = $${i++}`);  values.push(status) }
     if (user_id) { conditions.push(`q.user_id = $${i++}`); values.push(user_id) }
+    if (month) {
+      conditions.push(`TO_CHAR(q.created_at, 'YYYY-MM') = $${i++}`)
+      values.push(month)
+    }
+
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
     const { rows } = await pool.query(`
@@ -56,7 +62,6 @@ const QuoteRepository = {
     try {
       await client.query('BEGIN')
 
-      // Calcular total desde los ítems
       const total = items.reduce((acc, item) => acc + (item.unit_price * item.quantity), 0)
 
       const { rows } = await client.query(

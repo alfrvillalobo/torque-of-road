@@ -9,17 +9,15 @@ import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
 export default function CotizarPage() {
-  const [sent, setSent]                 = useState(false)
+  const [sent, setSent] = useState(false)
   const [wantsInstall, setWantsInstall] = useState(false)
-  // Fix #9: guardar lista de productos con problemas para mostrarlos al usuario
   const [unavailableProducts, setUnavailableProducts] = useState([])
-
-  const items          = useCartStore((s) => s.items)
-  const removeItem     = useCartStore((s) => s.removeItem)
+  const items = useCartStore((s) => s.items)
+  const removeItem = useCartStore((s) => s.removeItem)
   const updateQuantity = useCartStore((s) => s.updateQuantity)
-  const clear          = useCartStore((s) => s.clear)
-  const count          = useCartStore(selectCount)
-  const total          = useCartStore(selectTotal)
+  const clear = useCartStore((s) => s.clear)
+  const count = useCartStore(selectCount)
+  const total = useCartStore(selectTotal)
 
   const { register, handleSubmit, formState: { errors } } = useForm()
 
@@ -29,16 +27,16 @@ export default function CotizarPage() {
       if (wantsInstall) {
         notes += `\n\n--- Solicita instalación ---`
         if (data.install_address) notes += `\nDirección: ${data.install_address}`
-        if (data.install_date)    notes += `\nFecha preferida: ${data.install_date}`
+        if (data.install_date) notes += `\nFecha preferida: ${data.install_date}`
       }
       return quoteService.create({
-        customer_name:  data.name,
+        customer_name: data.name,
         customer_email: data.email,
         customer_phone: data.phone,
-        vehicle_make:   data.vehicle_make,
-        vehicle_model:  data.vehicle_model,
-        vehicle_year:   data.vehicle_year ? parseInt(data.vehicle_year) : undefined,
-        notes:          notes.trim(),
+        vehicle_make: data.vehicle_make,
+        vehicle_model: data.vehicle_model,
+        vehicle_year: data.vehicle_year ? parseInt(data.vehicle_year) : undefined,
+        notes: notes.trim(),
         items: items.map((i) => ({ product_id: i.id, quantity: i.quantity })),
       })
     },
@@ -49,11 +47,7 @@ export default function CotizarPage() {
     },
     onError: (err) => {
       const message = err.response?.data?.error || 'Error al enviar cotización'
-
-      // Fix #9: si el backend devuelve productos no disponibles, mostrarlos claramente
-      // en la UI en lugar de un toast genérico que el usuario puede ignorar
       if (err.response?.data?.error?.includes('no están disponibles')) {
-        // Extraer los nombres de la lista del mensaje de error del backend
         const match = message.match(/: (.+)\. Por favor/)
         if (match) {
           const names = match[1].split(', ').map((n) => n.replace(/^"|"$/g, ''))
@@ -99,8 +93,6 @@ export default function CotizarPage() {
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto', padding: '2rem 1.5rem' }}>
       <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: '2rem' }}>Solicitar cotización</h1>
-
-      {/* Fix #9: bloque de error visible cuando hay productos no disponibles */}
       {unavailableProducts.length > 0 && (
         <div style={{
           background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10,
@@ -125,8 +117,6 @@ export default function CotizarPage() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '2.5rem', alignItems: 'start' }}>
-
-        {/* ── Formulario ── */}
         <form onSubmit={handleSubmit((d) => submit.mutate(d))} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Tus datos</h3>
 
@@ -161,7 +151,7 @@ export default function CotizarPage() {
               <input {...register('vehicle_model')} placeholder="Hilux, Ranger..." style={inputStyle(false)} />
             </div>
             <div>
-              {/* Fix #8: año con validación de rango en el frontend también */}
+              { }
               <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 4 }}>Año</label>
               <input
                 type="number"
@@ -175,8 +165,6 @@ export default function CotizarPage() {
               {errors.vehicle_year && <p style={{ color: '#ef4444', fontSize: 11, marginTop: 2 }}>{errors.vehicle_year.message}</p>}
             </div>
           </div>
-
-          {/* Opción de instalación */}
           <div style={{ background: wantsInstall ? '#fff7ed' : '#f8f8f6', border: `1px solid ${wantsInstall ? '#fed7aa' : '#eee'}`, borderRadius: 8, padding: '1rem', transition: 'all 0.2s' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
               <input type="checkbox" checked={wantsInstall} onChange={(e) => setWantsInstall(e.target.checked)}
@@ -221,8 +209,6 @@ export default function CotizarPage() {
             {submit.isPending ? 'Enviando...' : 'Enviar cotización'}
           </button>
         </form>
-
-        {/* ── Resumen carrito ── */}
         <div style={{ background: '#f8f8f6', borderRadius: 10, padding: '1.5rem', position: 'sticky', top: 80 }}>
           <h3 style={{ margin: '0 0 1rem', fontSize: 16, fontWeight: 600 }}>
             Tu cotización ({count} {count === 1 ? 'producto' : 'productos'})
@@ -230,7 +216,6 @@ export default function CotizarPage() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
             {items.map((item) => {
-              // Fix #9: marcar visualmente los productos no disponibles en el carrito
               const isUnavailable = unavailableProducts.some(
                 (name) => name.toLowerCase() === item.name.toLowerCase()
               )
@@ -282,8 +267,6 @@ export default function CotizarPage() {
             <span>Total estimado</span>
             <span>{formatCLP(total)}</span>
           </div>
-
-          {/* Fix #10: aviso de que el precio final lo confirma el backend */}
           <p style={{ margin: '8px 0 0', fontSize: 12, color: '#888' }}>
             * Los precios se confirman al enviar. El total final puede variar si algún precio fue actualizado{wantsInstall ? ' o por el costo de instalación' : ''}.
           </p>

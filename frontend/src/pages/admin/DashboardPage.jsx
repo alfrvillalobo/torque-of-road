@@ -18,12 +18,11 @@ function StatusBadge({ status }) {
   return <span style={{ background: c + '18', color: c, padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{label}</span>
 }
 
-function filterThisMonth(items, dateField = 'created_at') {
+function getCurrentMonth() {
   const now = new Date()
-  return items.filter((item) => {
-    const d = new Date(item[dateField])
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-  })
+  const year  = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  return `${year}-${month}`
 }
 
 function StatCard({ icon: Icon, label, value, sub, color, to }) {
@@ -49,28 +48,29 @@ function StatCard({ icon: Icon, label, value, sub, color, to }) {
   return to ? <Link to={to} style={{ textDecoration: 'none' }}>{content}</Link> : content
 }
 
-// ── Modal cotización: Fix #5 — un solo clic aprueba + crea pedido en el backend ──
 function QuickQuoteModal({ quote, onClose }) {
   const qc = useQueryClient()
+  const currentMonth = getCurrentMonth()
 
   const reject = useMutation({
     mutationFn: () => quoteService.updateStatus(quote.id, 'rejected'),
     onSuccess: () => {
       toast.success('Cotización rechazada')
-      qc.invalidateQueries({ queryKey: ['quotes'] })
+      qc.invalidateQueries({ queryKey: ['quotes-month', currentMonth] })
+      qc.invalidateQueries({ queryKey: ['quotes-pending'] })
       onClose()
     },
     onError: (e) => toast.error(e.response?.data?.error || 'Error al rechazar'),
   })
 
-  // Fix #5: llama al endpoint del backend que hace ambas cosas en una transacción
-  // Si el backend falla en cualquier paso hace rollback — no queda en estado inconsistente
   const approveAndConvert = useMutation({
     mutationFn: () => quoteService.approveAndConvert(quote.id),
     onSuccess: () => {
       toast.success('✅ Cotización aprobada y pedido creado')
-      qc.invalidateQueries({ queryKey: ['quotes'] })
-      qc.invalidateQueries({ queryKey: ['orders'] })
+      qc.invalidateQueries({ queryKey: ['quotes-month', currentMonth] })
+      qc.invalidateQueries({ queryKey: ['quotes-pending'] })
+      qc.invalidateQueries({ queryKey: ['orders-month', currentMonth] })
+      qc.invalidateQueries({ queryKey: ['orders-active'] })
       onClose()
     },
     onError: (e) => toast.error(e.response?.data?.error || 'Error al procesar'),
@@ -88,13 +88,9 @@ function QuickQuoteModal({ quote, onClose }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
       <div style={{ background: '#fff', borderRadius: 12, padding: '1.75rem', width: '100%', maxWidth: 520, maxHeight: '88vh', overflowY: 'auto' }}>
-
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Cotización #{quote.id}</h3>
-          <button onClick={onClose} disabled={isPending}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}>
-            <X size={18} />
-          </button>
+          <button onClick={onClose} disabled={isPending} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}><X size={18} /></button>
         </div>
 
         <div style={{ background: '#f8f8f6', borderRadius: 8, padding: '0.875rem', marginBottom: '1rem' }}>
@@ -114,9 +110,7 @@ function QuickQuoteModal({ quote, onClose }) {
               <Wrench size={13} color="#f97316" />
               <span style={{ fontWeight: 600, fontSize: 13, color: '#c2410c' }}>Solicita instalación</span>
             </div>
-            {installLines.map((line, i) => (
-              <p key={i} style={{ margin: '1px 0', fontSize: 12, color: '#92400e' }}>{line}</p>
-            ))}
+            {installLines.map((line, i) => <p key={i} style={{ margin: '1px 0', fontSize: 12, color: '#92400e' }}>{line}</p>)}
           </div>
         )}
 
@@ -176,6 +170,7 @@ function QuickQuoteModal({ quote, onClose }) {
 
 function QuickOrderModal({ order, onClose }) {
   const qc = useQueryClient()
+  const currentMonth = getCurrentMonth()
   const STATUSES = ['pending', 'confirmed', 'in_progress', 'shipped', 'delivered', 'cancelled']
   const [status, setStatus] = useState(order.status)
 
@@ -183,7 +178,8 @@ function QuickOrderModal({ order, onClose }) {
     mutationFn: () => orderService.updateStatus(order.id, status),
     onSuccess: () => {
       toast.success('Estado actualizado')
-      qc.invalidateQueries({ queryKey: ['orders'] })
+      qc.invalidateQueries({ queryKey: ['orders-month', currentMonth] })
+      qc.invalidateQueries({ queryKey: ['orders-active'] })
       onClose()
     },
     onError: (e) => toast.error(e.response?.data?.error || 'Error'),
@@ -192,7 +188,6 @@ function QuickOrderModal({ order, onClose }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
       <div style={{ background: '#fff', borderRadius: 12, padding: '1.75rem', width: '100%', maxWidth: 480, maxHeight: '88vh', overflowY: 'auto' }}>
-
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Pedido #{order.id}</h3>
@@ -211,9 +206,7 @@ function QuickOrderModal({ order, onClose }) {
               WhatsApp al cliente
             </a>
           )}
-          {order.shipping_address && (
-            <p style={{ margin: '8px 0 0', fontSize: 13, color: '#666' }}>📍 {order.shipping_address}</p>
-          )}
+          {order.shipping_address && <p style={{ margin: '8px 0 0', fontSize: 13, color: '#666' }}>📍 {order.shipping_address}</p>}
         </div>
 
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0.875rem' }}>
@@ -240,10 +233,7 @@ function QuickOrderModal({ order, onClose }) {
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', justifyContent: 'flex-end' }}>
-          <button onClick={onClose}
-            style={{ padding: '0.6rem 1rem', border: '1px solid #ddd', borderRadius: 6, background: '#fff', fontSize: 14, cursor: 'pointer' }}>
-            Cerrar
-          </button>
+          <button onClick={onClose} style={{ padding: '0.6rem 1rem', border: '1px solid #ddd', borderRadius: 6, background: '#fff', fontSize: 14, cursor: 'pointer' }}>Cerrar</button>
           <select value={status} onChange={(e) => setStatus(e.target.value)}
             style={{ padding: '0.6rem 0.75rem', border: '1px solid #ddd', borderRadius: 6, fontSize: 14, background: '#fff', outline: 'none' }}>
             {STATUSES.map((s) => <option key={s} value={s}>{getStatusLabel(s).label}</option>)}
@@ -262,14 +252,15 @@ export default function DashboardPage() {
   const [quickQuote, setQuickQuote] = useState(null)
   const [quickOrder, setQuickOrder] = useState(null)
 
-  const { data: products = [] } = useQuery({ queryKey: ['products'], queryFn: () => productService.getAll() })
-  const { data: quotes   = [] } = useQuery({ queryKey: ['quotes'],   queryFn: () => quoteService.getAll() })
-  const { data: orders   = [] } = useQuery({ queryKey: ['orders'],   queryFn: () => orderService.getAll() })
-
-  const quotesThisMonth  = filterThisMonth(quotes)
-  const ordersThisMonth  = filterThisMonth(orders)
-  const pendingQuotes    = quotes.filter((q) => q.status === 'pending')
-  const activeOrders     = orders.filter((o) => !['delivered', 'cancelled'].includes(o.status))
+  const currentMonth = getCurrentMonth()
+  const now          = new Date()
+  const monthName    = now.toLocaleString('es-CL', { month: 'long' })
+  const { data: products       = [] } = useQuery({ queryKey: ['products'],                   queryFn: () => productService.getAll() })
+  const { data: quotesThisMonth = [] } = useQuery({ queryKey: ['quotes-month', currentMonth], queryFn: () => quoteService.getAll({ month: currentMonth }) })
+  const { data: ordersThisMonth = [] } = useQuery({ queryKey: ['orders-month', currentMonth], queryFn: () => orderService.getAll({ month: currentMonth }) })
+  const { data: pendingQuotes   = [] } = useQuery({ queryKey: ['quotes-pending'],             queryFn: () => quoteService.getAll({ status: 'pending' }) })
+  const { data: activeOrders    = [] } = useQuery({ queryKey: ['orders-active'],              queryFn: () => orderService.getAll() })
+  const activeFiltered = activeOrders.filter((o) => !['delivered', 'cancelled'].includes(o.status))
 
   const revenueThisMonth  = ordersThisMonth
     .filter((o) => o.status === 'delivered')
@@ -279,9 +270,6 @@ export default function DashboardPage() {
   const conversionRate    = quotesThisMonth.length > 0
     ? Math.round((approvedThisMonth / quotesThisMonth.length) * 100)
     : 0
-
-  const now       = new Date()
-  const monthName = now.toLocaleString('es-CL', { month: 'long' })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
@@ -304,13 +292,14 @@ export default function DashboardPage() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '1rem' }}>
-        <StatCard icon={FileText}    label="Cotizaciones este mes" value={quotesThisMonth.length}      sub={`${pendingQuotes.length} pendientes`} color="#3b82f6" to="/admin/cotizaciones" />
-        <StatCard icon={ShoppingBag} label="Pedidos este mes"      value={ordersThisMonth.length}      sub={`${activeOrders.length} en proceso`}  color="#a855f7" to="/admin/pedidos" />
-        <StatCard icon={TrendingUp}  label="Ingresos este mes"     value={formatCLP(revenueThisMonth)} sub="pedidos entregados"                    color="#22c55e" />
-        <StatCard icon={Package}     label="Tasa de conversión"    value={`${conversionRate}%`}        sub="cotización → aprobada"                 color="#f97316" />
+        <StatCard icon={FileText}    label="Cotizaciones este mes" value={quotesThisMonth.length}      sub={`${pendingQuotes.length} pendientes`}    color="#3b82f6" to="/admin/cotizaciones" />
+        <StatCard icon={ShoppingBag} label="Pedidos este mes"      value={ordersThisMonth.length}      sub={`${activeFiltered.length} en proceso`}   color="#a855f7" to="/admin/pedidos" />
+        <StatCard icon={TrendingUp}  label="Ingresos este mes"     value={formatCLP(revenueThisMonth)} sub="pedidos entregados"                       color="#22c55e" />
+        <StatCard icon={Package}     label="Tasa de conversión"    value={`${conversionRate}%`}        sub="cotización → aprobada"                    color="#f97316" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+
         <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', overflow: 'hidden' }}>
           <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Cotizaciones pendientes</h3>
@@ -348,12 +337,12 @@ export default function DashboardPage() {
             <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Pedidos en proceso</h3>
             <Link to="/admin/pedidos" style={{ fontSize: 12, color: '#f97316', textDecoration: 'none', fontWeight: 500 }}>Ver todos →</Link>
           </div>
-          {activeOrders.length === 0 ? (
+          {activeFiltered.length === 0 ? (
             <div style={{ padding: '2rem', textAlign: 'center' }}>
               <Clock size={28} color="#aaa" style={{ marginBottom: 8 }} />
               <p style={{ margin: 0, color: '#888', fontSize: 13 }}>No hay pedidos activos</p>
             </div>
-          ) : activeOrders.slice(0, 5).map((o) => (
+          ) : activeFiltered.slice(0, 5).map((o) => (
             <div key={o.id} style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid #f5f5f5', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: '0 0 3px', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.customer_name}</p>
@@ -378,7 +367,7 @@ export default function DashboardPage() {
           </div>
           {quotesThisMonth.length === 0 ? (
             <p style={{ padding: '1.5rem', color: '#888', fontSize: 13 }}>Sin cotizaciones este mes</p>
-          ) : [...quotesThisMonth].reverse().slice(0, 5).map((q) => (
+          ) : [...quotesThisMonth].slice(0, 5).map((q) => (
             <div key={q.id} style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid #f5f5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 500 }}>{q.customer_name}</p>
@@ -398,7 +387,7 @@ export default function DashboardPage() {
           </div>
           {ordersThisMonth.length === 0 ? (
             <p style={{ padding: '1.5rem', color: '#888', fontSize: 13 }}>Sin pedidos este mes</p>
-          ) : [...ordersThisMonth].reverse().slice(0, 5).map((o) => (
+          ) : [...ordersThisMonth].slice(0, 5).map((o) => (
             <div key={o.id} style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid #f5f5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 500 }}>{o.customer_name}</p>

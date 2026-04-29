@@ -5,8 +5,6 @@ const { requireAuth, requireAdmin } = require('../../middlewares/auth')
 
 const router = Router()
 
-// POST /api/uploads/product/:productId
-// Recibe la imagen via multipart/form-data, la sube a Cloudinary y guarda la URL en DB
 router.post(
   '/product/:productId',
   requireAuth,
@@ -28,8 +26,6 @@ router.post(
   }
 )
 
-// DELETE /api/uploads/image/:imageId
-// Elimina la imagen de la DB y de Cloudinary
 router.delete('/image/:imageId', requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const result = await UploadService.deleteImage(parseInt(req.params.imageId))

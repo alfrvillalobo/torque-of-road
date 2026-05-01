@@ -1,8 +1,10 @@
 const QuoteRepository   = require('./quote.repository')
 const ProductRepository = require('../products/repository')
+
 const VALID_STATUSES = ['pending', 'reviewed', 'approved', 'rejected']
+
 const YEAR_MIN = 1980
-const YEAR_MAX = new Date().getFullYear() + 1  
+const YEAR_MAX = new Date().getFullYear() + 1
 
 const QuoteService = {
   async getAll(filters) {
@@ -29,7 +31,7 @@ const QuoteService = {
       const err = new Error('Email del cliente inválido')
       err.status = 400; throw err
     }
-    if (!items || items.length === 0) {
+    if (!Array.isArray(items) || items.length === 0) {
       const err = new Error('La cotización debe tener al menos un producto')
       err.status = 400; throw err
     }
@@ -42,12 +44,20 @@ const QuoteService = {
       }
     }
 
-    const enrichedItems  = []
-    const unavailable    = []
+    // Fix 3: una sola query trae todos los productos necesarios
+    // En lugar de hacer 1 query por producto (N+1), traemos todos de una vez
+    const productIds = items.map((i) => i.product_id)
+    const products   = await ProductRepository.findByIds(productIds)
+
+    // Indexar por id para lookup O(1)
+    const productMap = {}
+    for (const p of products) productMap[p.id] = p
+
+    const enrichedItems = []
+    const unavailable   = []
 
     for (const item of items) {
-      const product = await ProductRepository.findById(item.product_id)
-
+      const product = productMap[item.product_id]
       if (!product) {
         unavailable.push(`Producto con id ${item.product_id} no encontrado`)
         continue
@@ -56,21 +66,21 @@ const QuoteService = {
         unavailable.push(`"${product.name}" ya no está disponible`)
         continue
       }
-
       enrichedItems.push({
         product_id:   product.id,
         product_name: product.name,
-        unit_price:   product.price, 
+        unit_price:   product.price,
         quantity:     item.quantity || 1,
       })
     }
+
     if (unavailable.length > 0) {
       const err = new Error(
         `Los siguientes productos no están disponibles: ${unavailable.join(', ')}. ` +
         `Por favor retíralos de tu cotización e intenta nuevamente.`
       )
       err.status = 400
-      err.unavailable_products = unavailable  
+      err.unavailable_products = unavailable
       throw err
     }
 

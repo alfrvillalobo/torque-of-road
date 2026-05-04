@@ -3,7 +3,6 @@ import { productService } from '../services/productService'
 import { categoryService } from '../services/index'
 import toast from 'react-hot-toast'
 
-// ─── Productos ────────────────────────────────────────────────
 export function useProducts(filters = {}) {
   return useQuery({
     queryKey: ['products', filters],
@@ -71,7 +70,6 @@ export function useDeleteProduct() {
   })
 }
 
-// ─── Categorías ───────────────────────────────────────────────
 export function useCategories() {
   return useQuery({
     queryKey: ['categories'],

@@ -16,12 +16,11 @@ function FeatureCard({ icon: Icon, title, desc }) {
 }
 
 export default function HomePage() {
-  const { data: products = [] } = useProducts()
-  const featured = products.slice(0, 4)
+  const { data: result } = useProducts({ limit: 4 })
+  const featured = result?.data ?? []
 
   return (
     <div>
-      {/* Hero */}
       <section style={{
         background: '#111', color: '#fff',
         padding: '5rem 1.5rem', textAlign: 'center',
@@ -44,19 +43,18 @@ export default function HomePage() {
             }}>
               Ver catálogo <ArrowRight size={16} />
             </Link>
-            <Link to="/contacto" style={{
+            <a href="https://wa.me/56973841370?text=Hola,%20estoy%20interesado%20en%20cotizar%20algunos%20productos%20de%20Torque%20Off%20Road.%20¿Me%20pueden%20ayudar?" target="_blank" rel="noreferrer" style={{
               display: 'inline-flex', alignItems: 'center', gap: 8,
               background: 'transparent', color: '#fff', textDecoration: 'none',
               padding: '0.875rem 1.75rem', borderRadius: 8, fontWeight: 500, fontSize: 15,
               border: '1px solid #444',
             }}>
               <Phone size={16} /> Contactar
-            </Link>
+            </a>
           </div>
         </div>
       </section>
 
-      {/* Features */}
       <section style={{ maxWidth: 1000, margin: '0 auto', padding: '4rem 1.5rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
           <FeatureCard icon={Wrench} title="Asesoría personalizada" desc="Recomendamos según tu modelo de camioneta y tipo de uso." />
@@ -66,7 +64,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Productos destacados */}
       {featured.length > 0 && (
         <section style={{ background: '#f8f8f6', padding: '4rem 1.5rem' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto' }}>
@@ -92,7 +89,6 @@ export default function HomePage() {
                     onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
                   >
 
-                    {/* Imagen */}
                     <div style={{
                       height: 200,
                       background: '#f8f8f6',
@@ -118,7 +114,6 @@ export default function HomePage() {
                         </div>
                       )}
 
-                      {/* Badge */}
                       <span style={{
                         position: 'absolute',
                         top: 10,
@@ -134,7 +129,6 @@ export default function HomePage() {
                       </span>
                     </div>
 
-                    {/* Info */}
                     <div style={{ padding: '1rem' }}>
                       {p.brand && (
                         <p style={{

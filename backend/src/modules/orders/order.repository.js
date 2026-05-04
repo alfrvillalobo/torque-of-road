@@ -1,7 +1,7 @@
 const pool = require('../../config/db')
 
 const OrderRepository = {
-  async findAll({ status, user_id, month } = {}) {
+  async findAll({ status, user_id, month, page = 1, limit = 20 } = {}) {
     const conditions = []
     const values = []
     let i = 1
@@ -14,25 +14,44 @@ const OrderRepository = {
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+    const offset = (page - 1) * limit
 
-    const { rows } = await pool.query(`
-      SELECT o.*,
-        json_agg(
-          json_build_object(
-            'id', oi.id, 'product_id', oi.product_id,
-            'product_name', oi.product_name,
-            'unit_price', oi.unit_price,
-            'quantity', oi.quantity,
-            'subtotal', oi.subtotal
-          )
-        ) FILTER (WHERE oi.id IS NOT NULL) AS items
-      FROM orders o
-      LEFT JOIN order_items oi ON oi.order_id = o.id
-      ${where}
-      GROUP BY o.id
-      ORDER BY o.created_at DESC
-    `, values)
-    return rows
+    const [countResult, dataResult] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*) FROM orders o ${where}`,
+        values
+      ),
+      pool.query(`
+        SELECT o.*,
+          json_agg(
+            json_build_object(
+              'id', oi.id, 'product_id', oi.product_id,
+              'product_name', oi.product_name,
+              'unit_price', oi.unit_price,
+              'quantity', oi.quantity,
+              'subtotal', oi.subtotal
+            )
+          ) FILTER (WHERE oi.id IS NOT NULL) AS items
+        FROM orders o
+        LEFT JOIN order_items oi ON oi.order_id = o.id
+        ${where}
+        GROUP BY o.id
+        ORDER BY o.created_at DESC
+        LIMIT $${i} OFFSET $${i + 1}
+      `, [...values, limit, offset])
+    ])
+
+    const total = parseInt(countResult.rows[0].count)
+
+    return {
+      data: dataResult.rows,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    }
   },
 
   async findById(id) {

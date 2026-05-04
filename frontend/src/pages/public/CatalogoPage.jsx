@@ -85,11 +85,12 @@ export default function CatalogoPage() {
   const [model, setModel]             = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
-  const { data: products = [], isLoading } = useProducts({
+  const { data: result, isLoading } = useProducts({
     category: category || undefined,
     make:     make     || undefined,
     model:    model    || undefined,
   })
+  const products = result?.data ?? []
   const { data: categories = [] } = useCategories()
   const cartCount = useCartStore(selectCount)
 

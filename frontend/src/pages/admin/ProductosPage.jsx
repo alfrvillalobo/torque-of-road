@@ -2,12 +2,12 @@ import { useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { Plus, Pencil, Trash2, X, Search, Upload, ImageOff } from 'lucide-react'
 import { useProducts, useCategories, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../../hooks/useProducts'
+import Pagination from '../../components/Pagination'
 import { formatCLP } from '../../utils/format'
 import { useAuthStore } from '../../context/authStore'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
-// ── Componente de subida de imágenes ──────────────────────────
 function ImageUploader({ productId, existingImages = [], onImagesChange }) {
   const [uploading, setUploading] = useState(false)
   const [images, setImages]       = useState(existingImages)
@@ -17,7 +17,6 @@ function ImageUploader({ productId, existingImages = [], onImagesChange }) {
     const file = e.target.files[0]
     if (!file) return
 
-    // Preview local inmediata mientras sube
     const localUrl = URL.createObjectURL(file)
     const tempId   = 'temp-' + Date.now()
     const preview  = { id: tempId, url: localUrl, uploading: true }
@@ -33,7 +32,6 @@ function ImageUploader({ productId, existingImages = [], onImagesChange }) {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
 
-      // Reemplazar preview temporal con la URL real de Cloudinary
       const final = updated.map((img) =>
         img.id === tempId ? { ...res.data.data, uploading: false } : img
       )
@@ -41,7 +39,6 @@ function ImageUploader({ productId, existingImages = [], onImagesChange }) {
       onImagesChange?.(final)
       toast.success('Imagen subida')
     } catch (err) {
-      // Quitar la preview si falla
       setImages(images)
       toast.error(err.response?.data?.error || 'Error al subir imagen')
     } finally {
@@ -69,7 +66,6 @@ function ImageUploader({ productId, existingImages = [], onImagesChange }) {
         Imágenes del producto
       </label>
 
-      {/* Grid de imágenes actuales */}
       {images.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
           {images.map((img) => (
@@ -113,7 +109,6 @@ function ImageUploader({ productId, existingImages = [], onImagesChange }) {
         </div>
       )}
 
-      {/* Botón de subida */}
       <input
         ref={fileRef}
         type="file"
@@ -143,7 +138,6 @@ function ImageUploader({ productId, existingImages = [], onImagesChange }) {
   )
 }
 
-// ── Modal de formulario ────────────────────────────────────────
 function ProductModal({ product, categories, onClose }) {
   const { register, handleSubmit, formState: { errors } } = useForm({
     defaultValues: product || { stock_status: 'bajo_pedido', is_active: true },
@@ -160,7 +154,6 @@ function ProductModal({ product, categories, onClose }) {
     } else {
       create.mutate(payload, {
         onSuccess: (newProduct) => {
-          // Guardamos el id para que ImageUploader pueda subir al endpoint correcto
           setSavedId(newProduct.id)
           toast.success('Producto creado — ahora puedes agregar imágenes')
         },
@@ -192,7 +185,6 @@ function ProductModal({ product, categories, onClose }) {
           </button>
         </div>
 
-        {/* Si el producto ya fue creado, mostrar uploader de imágenes */}
         {savedId && !product ? (
           <div>
             <p style={{ fontSize: 14, color: '#666', marginBottom: '1rem' }}>
@@ -262,7 +254,6 @@ function ProductModal({ product, categories, onClose }) {
               </div>
             </div>
 
-            {/* Imágenes — solo visible al editar (el producto ya tiene id) */}
             {product && (
               <ImageUploader
                 productId={product.id}
@@ -299,16 +290,25 @@ function ProductModal({ product, categories, onClose }) {
   )
 }
 
-// ── Página principal ───────────────────────────────────────────
 export default function ProductosPage() {
-  const [search, setSearch]         = useState('')
+  const [search, setSearch]                 = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
-  const [modalOpen, setModalOpen]   = useState(false)
-  const [editing, setEditing]       = useState(null)
+  const [page, setPage]                     = useState(1)
+  const [modalOpen, setModalOpen]           = useState(false)
+  const [editing, setEditing]               = useState(null)
 
-  const { data: products = [], isLoading } = useProducts({ category: categoryFilter || undefined })
-  const { data: categories = [] }          = useCategories()
-  const deleteProduct                      = useDeleteProduct()
+  const handleCategoryFilter = (value) => { setCategoryFilter(value); setPage(1) }
+
+  const { data: result, isLoading } = useProducts({
+    category: categoryFilter || undefined,
+    page,
+    limit: 20,
+  })
+  const products   = result?.data       ?? []
+  const pagination = result?.pagination ?? null
+
+  const { data: categories = [] } = useCategories()
+  const deleteProduct             = useDeleteProduct()
 
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -327,7 +327,6 @@ export default function ProductosPage() {
 
   return (
     <div>
-      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Productos</h2>
         <button onClick={handleNew} style={{
@@ -340,7 +339,6 @@ export default function ProductosPage() {
         </button>
       </div>
 
-      {/* Filtros */}
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
         <div style={{ position: 'relative', flex: 1 }}>
           <Search size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#aaa' }} />
@@ -348,14 +346,13 @@ export default function ProductosPage() {
             placeholder="Buscar por nombre o SKU..."
             style={{ width: '100%', padding: '0.6rem 0.75rem 0.6rem 2rem', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none' }} />
         </div>
-        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
+        <select value={categoryFilter} onChange={(e) => handleCategoryFilter(e.target.value)}
           style={{ padding: '0.6rem 0.75rem', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, background: '#fff', outline: 'none' }}>
           <option value="">Todas las categorías</option>
           {categories.map((c) => <option key={c.id} value={c.slug}>{c.name}</option>)}
         </select>
       </div>
 
-      {/* Tabla */}
       <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
@@ -374,7 +371,6 @@ export default function ProductosPage() {
               <tr key={p.id} style={{ borderBottom: '1px solid #f5f5f5' }}>
                 <td style={{ padding: '0.875rem 1rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    {/* Miniatura */}
                     <div style={{ width: 44, height: 44, borderRadius: 6, overflow: 'hidden', border: '1px solid #eee', flexShrink: 0, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {p.main_image
                         ? <img src={p.main_image} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -413,6 +409,7 @@ export default function ProductosPage() {
             ))}
           </tbody>
         </table>
+        <Pagination pagination={pagination} onPageChange={setPage} />
       </div>
 
       {modalOpen && (

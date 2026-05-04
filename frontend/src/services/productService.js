@@ -2,7 +2,10 @@ import api from './api'
 
 export const productService = {
   getAll: (params = {}) =>
-    api.get('/products', { params }).then((r) => r.data.data),
+    api.get('/products', { params }).then((r) => ({
+      data:       r.data.data,
+      pagination: r.data.pagination,
+    })),
 
   getById: (id) =>
     api.get(`/products/${id}`).then((r) => r.data.data),
@@ -11,7 +14,10 @@ export const productService = {
     api.get(`/products/slug/${slug}`).then((r) => r.data.data),
 
   getCompatible: (params) =>
-    api.get('/products/compatible', { params }).then((r) => r.data.data),
+    api.get('/products/compatible', { params }).then((r) => ({
+      data:       r.data.data,
+      pagination: r.data.pagination,
+    })),
 
   create: (data) =>
     api.post('/products', data).then((r) => r.data.data),

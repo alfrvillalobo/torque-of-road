@@ -255,11 +255,17 @@ export default function DashboardPage() {
   const currentMonth = getCurrentMonth()
   const now          = new Date()
   const monthName    = now.toLocaleString('es-CL', { month: 'long' })
-  const { data: products       = [] } = useQuery({ queryKey: ['products'],                   queryFn: () => productService.getAll() })
-  const { data: quotesThisMonth = [] } = useQuery({ queryKey: ['quotes-month', currentMonth], queryFn: () => quoteService.getAll({ month: currentMonth }) })
-  const { data: ordersThisMonth = [] } = useQuery({ queryKey: ['orders-month', currentMonth], queryFn: () => orderService.getAll({ month: currentMonth }) })
-  const { data: pendingQuotes   = [] } = useQuery({ queryKey: ['quotes-pending'],             queryFn: () => quoteService.getAll({ status: 'pending' }) })
-  const { data: activeOrders    = [] } = useQuery({ queryKey: ['orders-active'],              queryFn: () => orderService.getAll() })
+  const { data: productsResult }        = useQuery({ queryKey: ['products', { limit: 100 }],          queryFn: () => productService.getAll({ limit: 100 }) })
+  const { data: quotesMonthResult }     = useQuery({ queryKey: ['quotes-month', currentMonth],         queryFn: () => quoteService.getAll({ month: currentMonth, limit: 100 }) })
+  const { data: ordersMonthResult }     = useQuery({ queryKey: ['orders-month', currentMonth],         queryFn: () => orderService.getAll({ month: currentMonth, limit: 100 }) })
+  const { data: pendingQuotesResult }   = useQuery({ queryKey: ['quotes-pending'],                     queryFn: () => quoteService.getAll({ status: 'pending', limit: 100 }) })
+  const { data: activeOrdersResult }    = useQuery({ queryKey: ['orders-active'],                      queryFn: () => orderService.getAll({ limit: 100 }) })
+  const products       = productsResult?.data      ?? []
+  const quotesThisMonth = quotesMonthResult?.data   ?? []
+  const ordersThisMonth = ordersMonthResult?.data   ?? []
+  const pendingQuotes   = pendingQuotesResult?.data ?? []
+  const activeOrders    = activeOrdersResult?.data  ?? []
+
   const activeFiltered = activeOrders.filter((o) => !['delivered', 'cancelled'].includes(o.status))
 
   const revenueThisMonth  = ordersThisMonth

@@ -7,10 +7,15 @@ const router = Router()
 
 router.get('/', requireAuth, async (req, res, next) => {
   try {
+    const page  = Math.max(1, parseInt(req.query.page)  || 1)
+    const limit = Math.min(100, parseInt(req.query.limit) || 20)
+
     const filters = req.user.role === 'admin'
-      ? { status: req.query.status, month: req.query.month }
-      : { user_id: req.user.id }
-    res.json({ success: true, data: await OrderService.getAll(filters) })
+      ? { status: req.query.status, month: req.query.month, page, limit }
+      : { user_id: req.user.id, page, limit }
+
+    const result = await OrderService.getAll(filters)
+    res.json({ success: true, ...result })
   } catch (e) { next(e) }
 })
 

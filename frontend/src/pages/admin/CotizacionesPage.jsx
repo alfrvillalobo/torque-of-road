@@ -4,10 +4,10 @@ import { Eye, CheckCircle, XCircle, ArrowRight, Plus, Trash2, X, Search, Wrench,
 import { quoteService, orderService } from '../../services/index'
 import { productService } from '../../services/productService'
 import { formatCLP, formatDateTime, getStatusLabel } from '../../utils/format'
+import Pagination from '../../components/Pagination'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
-// ── Utilidades ────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const { label, color } = getStatusLabel(status)
   const colors = { amber: '#f97316', blue: '#3b82f6', green: '#22c55e', red: '#ef4444', gray: '#888' }
@@ -25,7 +25,6 @@ const inp = (hasError = false) => ({
   borderRadius: 6, fontSize: 14, outline: 'none', boxSizing: 'border-box',
 })
 
-// ── Modal detalle cotización ──────────────────────────────────
 function QuoteDetailModal({ quote, onClose }) {
   const qc = useQueryClient()
 
@@ -70,7 +69,6 @@ function QuoteDetailModal({ quote, onClose }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}><X size={20} /></button>
         </div>
 
-        {/* Cliente */}
         <div style={{ background: '#f8f8f6', borderRadius: 8, padding: '1rem', marginBottom: '1.25rem' }}>
           <p style={{ margin: '0 0 2px', fontWeight: 600, fontSize: 15 }}>{quote.customer_name}</p>
           <p style={{ margin: '0 0 2px', fontSize: 13, color: '#666' }}>{quote.customer_email}</p>
@@ -84,7 +82,6 @@ function QuoteDetailModal({ quote, onClose }) {
           )}
         </div>
 
-        {/* Instalación */}
         {wantsInstall && (
           <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '1rem', marginBottom: '1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
@@ -97,7 +94,6 @@ function QuoteDetailModal({ quote, onClose }) {
           </div>
         )}
 
-        {/* Observaciones */}
         {cleanNotes && (
           <div style={{ background: '#f8f8f6', borderRadius: 8, padding: '0.875rem 1rem', marginBottom: '1.25rem' }}>
             <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>Observaciones</p>
@@ -105,7 +101,6 @@ function QuoteDetailModal({ quote, onClose }) {
           </div>
         )}
 
-        {/* Productos */}
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
           <thead>
             <tr style={{ background: '#f8f8f6', borderBottom: '1px solid #eee' }}>
@@ -158,7 +153,6 @@ function QuoteDetailModal({ quote, onClose }) {
   )
 }
 
-// ── Modal nueva cotización manual ─────────────────────────────
 function NewQuoteModal({ onClose }) {
   const qc = useQueryClient()
   const [wantsInstall, setWantsInstall] = useState(false)
@@ -171,10 +165,11 @@ function NewQuoteModal({ onClose }) {
     install_address: '', install_date: '', notes: '',
   })
 
-  const { data: products = [] } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => productService.getAll(),
+  const { data: result } = useQuery({
+    queryKey: ['products', { limit: 100 }],
+    queryFn: () => productService.getAll({ limit: 100 }),
   })
+  const products = result?.data ?? []
 
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
@@ -243,7 +238,6 @@ function NewQuoteModal({ onClose }) {
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
       <div style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 880, maxHeight: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 1.75rem', borderBottom: '1px solid #eee', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <PackagePlus size={20} color="#f97316" />
@@ -254,7 +248,6 @@ function NewQuoteModal({ onClose }) {
 
         <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', flex: 1, overflow: 'hidden' }}>
 
-          {/* ── Izquierda: datos cliente ── */}
           <div style={{ padding: '1.5rem 1.75rem', borderRight: '1px solid #eee', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
             <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>Datos del cliente</p>
@@ -295,7 +288,6 @@ function NewQuoteModal({ onClose }) {
               </div>
             </div>
 
-            {/* Instalación */}
             <div style={{ background: wantsInstall ? '#fff7ed' : '#f8f8f6', border: `1px solid ${wantsInstall ? '#fed7aa' : '#eee'}`, borderRadius: 8, padding: '0.875rem', transition: 'all 0.2s' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
                 <input type="checkbox" checked={wantsInstall} onChange={(e) => setWantsInstall(e.target.checked)}
@@ -327,12 +319,10 @@ function NewQuoteModal({ onClose }) {
             </div>
           </div>
 
-          {/* ── Derecha: productos ── */}
           <div style={{ padding: '1.5rem 1.75rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
             <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>Productos</p>
 
-            {/* Buscador */}
             <div style={{ position: 'relative' }}>
               <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#aaa' }} />
               <input value={productSearch} onChange={(e) => setProductSearch(e.target.value)}
@@ -340,7 +330,6 @@ function NewQuoteModal({ onClose }) {
                 style={{ ...inp(), paddingLeft: '2rem' }} />
             </div>
 
-            {/* Lista de productos */}
             <div style={{ border: '1px solid #eee', borderRadius: 8, maxHeight: 210, overflowY: 'auto' }}>
               {filtered.length === 0 ? (
                 <p style={{ padding: '1rem', color: '#888', fontSize: 13, textAlign: 'center' }}>No hay productos</p>
@@ -361,7 +350,6 @@ function NewQuoteModal({ onClose }) {
               ))}
             </div>
 
-            {/* Carrito */}
             <div>
               <p style={{ margin: '0 0 6px', fontSize: 13, fontWeight: 600, color: '#333' }}>
                 Seleccionados {cartItems.length > 0 && `(${cartItems.length})`}
@@ -404,7 +392,6 @@ function NewQuoteModal({ onClose }) {
               )}
             </div>
 
-            {/* Botones */}
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: 'auto', paddingTop: '0.5rem' }}>
               <button type="button" onClick={onClose}
                 style={{ padding: '0.65rem 1.25rem', border: '1px solid #ddd', borderRadius: 6, background: '#fff', fontSize: 14, cursor: 'pointer' }}>
@@ -422,17 +409,29 @@ function NewQuoteModal({ onClose }) {
   )
 }
 
-// ── Página principal ──────────────────────────────────────────
 export default function CotizacionesPage() {
   const [statusFilter, setStatusFilter] = useState('')
+  const [page, setPage]                 = useState(1)
   const [selected, setSelected]         = useState(null)
   const [newModal, setNewModal]         = useState(false)
   const qc = useQueryClient()
 
-  const { data: quotes = [], isLoading } = useQuery({
-    queryKey: ['quotes', statusFilter],
-    queryFn: () => quoteService.getAll(statusFilter ? { status: statusFilter } : {}),
+  const handleStatusFilter = (value) => {
+    setStatusFilter(value)
+    setPage(1)
+  }
+
+  const { data: result, isLoading } = useQuery({
+    queryKey: ['quotes', statusFilter, page],
+    queryFn: () => quoteService.getAll({
+      ...(statusFilter ? { status: statusFilter } : {}),
+      page,
+      limit: 20,
+    }),
   })
+
+  const quotes     = result?.data       ?? []
+  const pagination = result?.pagination ?? null
 
   const deleteQuote = useMutation({
     mutationFn: (id) => api.delete(`/quotes/${id}`),
@@ -450,7 +449,7 @@ export default function CotizacionesPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Cotizaciones</h2>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+          <select value={statusFilter} onChange={(e) => handleStatusFilter(e.target.value)}
             style={{ padding: '0.6rem 0.75rem', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, background: '#fff', outline: 'none' }}>
             <option value="">Todos los estados</option>
             <option value="pending">Pendientes</option>
@@ -522,6 +521,7 @@ export default function CotizacionesPage() {
             })}
           </tbody>
         </table>
+        <Pagination pagination={pagination} onPageChange={setPage} />
       </div>
 
       {selected && <QuoteDetailModal quote={selected} onClose={() => setSelected(null)} />}

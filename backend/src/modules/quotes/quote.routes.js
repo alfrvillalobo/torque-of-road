@@ -1,4 +1,5 @@
 const { Router } = require('express')
+const rateLimit                     = require('express-rate-limit')
 const QuoteService                  = require('./quote.service')
 const pool                          = require('../../config/db')
 const { requireAuth, requireAdmin } = require('../../middlewares/auth')
@@ -6,13 +7,25 @@ const validateId                    = require('../../middlewares/validateId')
 
 const router = Router()
 
-// GET /api/quotes?status=pending&month=2025-04
+const quoteLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Demasiadas solicitudes. Intenta de nuevo en una hora.' },
+})
+
 router.get('/', requireAuth, async (req, res, next) => {
   try {
+    const page  = Math.max(1, parseInt(req.query.page)  || 1)
+    const limit = Math.min(100, parseInt(req.query.limit) || 20)
+
     const filters = req.user.role === 'admin'
-      ? { status: req.query.status, month: req.query.month }
-      : { user_id: req.user.id }
-    res.json({ success: true, data: await QuoteService.getAll(filters) })
+      ? { status: req.query.status, month: req.query.month, page, limit }
+      : { user_id: req.user.id, page, limit }
+
+    const result = await QuoteService.getAll(filters)
+    res.json({ success: true, ...result })
   } catch (e) { next(e) }
 })
 
@@ -26,8 +39,7 @@ router.get('/:id', requireAuth, validateId, async (req, res, next) => {
   } catch (e) { next(e) }
 })
 
-// POST /api/quotes — público (sin login también)
-router.post('/', async (req, res, next) => {
+router.post('/', quoteLimiter, async (req, res, next) => {
   try {
     const data = { ...req.body, user_id: req.user?.id || null }
     res.status(201).json({ success: true, data: await QuoteService.create(data) })
@@ -41,7 +53,6 @@ router.patch('/:id/status', requireAuth, requireAdmin, validateId, async (req, r
   } catch (e) { next(e) }
 })
 
-// Aprobar + crear pedido en una sola transacción PostgreSQL
 router.post('/:id/approve-and-convert', requireAuth, requireAdmin, validateId, async (req, res, next) => {
   const client = await pool.connect()
   try {
@@ -99,7 +110,6 @@ router.post('/:id/approve-and-convert', requireAuth, requireAdmin, validateId, a
   }
 })
 
-// Eliminar cotización — solo admin
 router.delete('/:id', requireAuth, requireAdmin, validateId, async (req, res, next) => {
   try {
     const { rows } = await pool.query('DELETE FROM quotes WHERE id = $1 RETURNING id', [req.params.id])

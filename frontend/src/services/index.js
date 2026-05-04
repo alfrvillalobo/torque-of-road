@@ -27,7 +27,10 @@ export const categoryService = {
 
 export const quoteService = {
   getAll: (params) =>
-    api.get('/quotes', { params }).then((r) => r.data.data),
+    api.get('/quotes', { params }).then((r) => ({
+      data:       r.data.data,
+      pagination: r.data.pagination,
+    })),
 
   getById: (id) =>
     api.get(`/quotes/${id}`).then((r) => r.data.data),
@@ -38,18 +41,19 @@ export const quoteService = {
   updateStatus: (id, status) =>
     api.patch(`/quotes/${id}/status`, { status }).then((r) => r.data.data),
 
-  // Fix #5: llama al endpoint que hace aprobar + crear pedido en una sola transacción
   approveAndConvert: (id) =>
     api.post(`/quotes/${id}/approve-and-convert`).then((r) => r.data),
 
-  // Fix #1: eliminar cotización
   delete: (id) =>
     api.delete(`/quotes/${id}`).then((r) => r.data),
 }
 
 export const orderService = {
   getAll: (params) =>
-    api.get('/orders', { params }).then((r) => r.data.data),
+    api.get('/orders', { params }).then((r) => ({
+      data:       r.data.data,
+      pagination: r.data.pagination,
+    })),
 
   getById: (id) =>
     api.get(`/orders/${id}`).then((r) => r.data.data),

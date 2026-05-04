@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Eye } from 'lucide-react'
 import { orderService } from '../../services/index'
 import { formatCLP, formatDateTime, getStatusLabel } from '../../utils/format'
+import Pagination from '../../components/Pagination'
 import toast from 'react-hot-toast'
 
 const STATUSES = ['pending','confirmed','in_progress','shipped','delivered','cancelled']
@@ -63,7 +64,6 @@ function OrderDetailModal({ order, onClose }) {
           Total: {formatCLP(order.total)}
         </div>
 
-        {/* Cambiar estado */}
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', justifyContent: 'flex-end' }}>
           <button onClick={onClose} style={{ padding: '0.6rem 1rem', border: '1px solid #ddd', borderRadius: 6, background: '#fff', fontSize: 14, cursor: 'pointer' }}>
             Cerrar
@@ -84,18 +84,31 @@ function OrderDetailModal({ order, onClose }) {
 
 export default function PedidosPage() {
   const [statusFilter, setStatusFilter] = useState('')
-  const [selected, setSelected] = useState(null)
+  const [page, setPage]                 = useState(1)
+  const [selected, setSelected]         = useState(null)
 
-  const { data: orders = [], isLoading } = useQuery({
-    queryKey: ['orders', statusFilter],
-    queryFn: () => orderService.getAll(statusFilter ? { status: statusFilter } : {}),
+  const handleStatusFilter = (value) => {
+    setStatusFilter(value)
+    setPage(1)
+  }
+
+  const { data: result, isLoading } = useQuery({
+    queryKey: ['orders', statusFilter, page],
+    queryFn: () => orderService.getAll({
+      ...(statusFilter ? { status: statusFilter } : {}),
+      page,
+      limit: 20,
+    }),
   })
+
+  const orders     = result?.data       ?? []
+  const pagination = result?.pagination ?? null
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Pedidos</h2>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+        <select value={statusFilter} onChange={(e) => handleStatusFilter(e.target.value)}
           style={{ padding: '0.6rem 0.75rem', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, background: '#fff' }}>
           <option value="">Todos los estados</option>
           {STATUSES.map((s) => <option key={s} value={s}>{getStatusLabel(s).label}</option>)}
@@ -135,6 +148,7 @@ export default function PedidosPage() {
             ))}
           </tbody>
         </table>
+        <Pagination pagination={pagination} onPageChange={setPage} />
       </div>
 
       {selected && <OrderDetailModal order={selected} onClose={() => setSelected(null)} />}

@@ -23,7 +23,7 @@ function InstagramIcon() {
 
 export default function PublicLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
-  const count    = useCartStore(selectCount)   // selector derivado, reactivo
+  const count    = useCartStore(selectCount)   
   const { pathname } = useLocation()
 
   const navLinks = [
@@ -35,7 +35,6 @@ export default function PublicLayout() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
 
-      {/* ── Navbar ─────────────────────────────────────────── */}
       <header style={{ position: 'sticky', top: 0, zIndex: 50, background: '#111', borderBottom: '1px solid #1f1f1f' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
 
@@ -104,7 +103,6 @@ export default function PublicLayout() {
         <Outlet />
       </main>
 
-      {/* ── Footer ─────────────────────────────────────────── */}
       <footer style={{ background: '#0a0a0a', borderTop: '1px solid #1f1f1f', marginTop: 'auto' }}>
 
         <div style={{ background: '#f97316', padding: '1.25rem 1.5rem' }}>
@@ -152,7 +150,6 @@ export default function PublicLayout() {
                 { to: '/catalogo', label: 'Catálogo de productos' },
                 { to: '/nosotros', label: 'Quiénes somos' },
                 { to: '/cotizar',  label: 'Solicitar cotización' },
-                { to: '/contacto', label: 'Contacto' },
               ].map((l) => (
                 <Link key={l.to} to={l.to}
                   style={{ color: '#666', textDecoration: 'none', fontSize: 14 }}
@@ -178,7 +175,7 @@ export default function PublicLayout() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
                 { Icon: MapPin, text: 'El Sol 261, La Florida, Santiago' },
-                { Icon: Phone,  text: '+56 9 7384 1370', href: 'tel:+56973841370' },
+                { Icon: Phone,  text: '+56 9 7384 1370', href: 'https://wa.me/56973841370?text=Hola,%20estoy%20interesado%20en%20cotizar%20algunos%20productos%20de%20Torque%20Off%20Road.%20¿Me%20pueden%20ayudar?' },
                 { Icon: Mail,   text: 'czenteno3@gmail.com', href: 'mailto:czenteno3@gmail.com' },
               ].map(({ Icon, text, href }) => (
                 <div key={text} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>

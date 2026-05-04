@@ -3,10 +3,12 @@ const ProductService = require('./service')
 const ProductController = {
   async getAll(req, res, next) {
     try {
-      // Filtros desde query params: ?category=kits-suspension&make=Toyota&model=Hilux&year=2022
       const { category, make, model, year, is_active } = req.query
-      const products = await ProductService.getAll({ category, make, model, year, is_active })
-      res.json({ success: true, data: products, total: products.length })
+      const page  = Math.max(1, parseInt(req.query.page)  || 1)
+      const limit = Math.min(100, parseInt(req.query.limit) || 20)
+
+      const result = await ProductService.getAll({ category, make, model, year, is_active, page, limit })
+      res.json({ success: true, ...result })
     } catch (err) {
       next(err)
     }
@@ -33,8 +35,11 @@ const ProductController = {
   async getCompatible(req, res, next) {
     try {
       const { make, model, year } = req.query
-      const products = await ProductService.getCompatibleWithVehicle({ make, model, year })
-      res.json({ success: true, data: products, total: products.length })
+      const page  = Math.max(1, parseInt(req.query.page)  || 1)
+      const limit = Math.min(100, parseInt(req.query.limit) || 20)
+
+      const result = await ProductService.getCompatibleWithVehicle({ make, model, year, page, limit })
+      res.json({ success: true, ...result })
     } catch (err) {
       next(err)
     }

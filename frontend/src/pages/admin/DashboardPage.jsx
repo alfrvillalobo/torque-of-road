@@ -76,18 +76,25 @@ function QuickQuoteModal({ quote, onClose }) {
     onError: (e) => toast.error(e.response?.data?.error || 'Error al procesar'),
   })
 
-  const isPending    = reject.isPending || approveAndConvert.isPending
-  const wantsInstall = quote.notes?.includes('--- Solicita instalación ---')
-  const cleanNotes   = wantsInstall
-    ? quote.notes.split('\n\n--- Solicita instalación ---')[0]?.trim()
-    : quote.notes
-  const installLines = wantsInstall
-    ? quote.notes.split('--- Solicita instalación ---')[1]?.trim().split('\n').filter(Boolean)
-    : []
+  const [installCost, setInstallCost] = useState(quote.installation_cost || 0)
+
+  const updateInstallCost = useMutation({
+    mutationFn: () => quoteService.updateInstallationCost(quote.id, installCost),
+    onSuccess: (updatedQuote) => {
+      toast.success('Costo de instalación actualizado')
+      quote.installation_cost = updatedQuote.installation_cost
+      quote.total             = updatedQuote.total
+      qc.invalidateQueries({ queryKey: ['quotes-pending'] })
+    },
+    onError: (e) => toast.error(e.response?.data?.error || 'Error al actualizar'),
+  })
+
+  const isPending    = reject.isPending || approveAndConvert.isPending || updateInstallCost.isPending
+  const wantsInstall = quote.wants_installation
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-      <div style={{ background: '#fff', borderRadius: 12, padding: '1.75rem', width: '100%', maxWidth: 520, maxHeight: '88vh', overflowY: 'auto' }}>
+      <div className="dash-modal-box" style={{ background: '#fff', borderRadius: 12, padding: '1.75rem', width: '100%', maxWidth: 520, maxHeight: '88vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Cotización #{quote.id}</h3>
           <button onClick={onClose} disabled={isPending} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}><X size={18} /></button>
@@ -105,19 +112,16 @@ function QuickQuoteModal({ quote, onClose }) {
         </div>
 
         {wantsInstall && (
-          <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '0.75rem', marginBottom: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-              <Wrench size={13} color="#f97316" />
-              <span style={{ fontWeight: 600, fontSize: 13, color: '#c2410c' }}>Solicita instalación</span>
-            </div>
-            {installLines.map((line, i) => <p key={i} style={{ margin: '1px 0', fontSize: 12, color: '#92400e' }}>{line}</p>)}
+          <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '0.75rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Wrench size={13} color="#f97316" />
+            <span style={{ fontWeight: 600, fontSize: 13, color: '#c2410c' }}>El cliente quiere cotizar instalación</span>
           </div>
         )}
 
-        {cleanNotes && (
+        {quote.notes && (
           <div style={{ background: '#f8f8f6', borderRadius: 8, padding: '0.75rem', marginBottom: '1rem' }}>
             <p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 600, color: '#888', textTransform: 'uppercase' }}>Observaciones</p>
-            <p style={{ margin: 0, fontSize: 13, color: '#555', whiteSpace: 'pre-line' }}>{cleanNotes}</p>
+            <p style={{ margin: 0, fontSize: 13, color: '#555', whiteSpace: 'pre-line' }}>{quote.notes}</p>
           </div>
         )}
 
@@ -140,8 +144,60 @@ function QuickQuoteModal({ quote, onClose }) {
           </tbody>
         </table>
 
-        <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 16, marginBottom: '1.25rem' }}>
-          Total: {formatCLP(quote.total)}
+        {/* Campo editable costo instalación */}
+        <div style={{ background: '#f8f8f6', borderRadius: 8, padding: '0.875rem 1rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.625rem' }}>
+            <Wrench size={14} color="#f97316" />
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>Costo de instalación</span>
+            {wantsInstall && (
+              <span style={{ background: '#fff7ed', color: '#c2410c', fontSize: 11, fontWeight: 500, padding: '1px 7px', borderRadius: 20, border: '1px solid #fed7aa' }}>
+                Cliente lo solicitó
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#888' }}>$</span>
+              <input
+                type="number" min="0"
+                value={installCost}
+                onChange={(e) => setInstallCost(Math.max(0, parseInt(e.target.value) || 0))}
+                style={{ width: '100%', padding: '0.5rem 0.75rem 0.5rem 1.5rem', border: '1px solid #ddd', borderRadius: 6, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+            <button
+              onClick={() => updateInstallCost.mutate()}
+              disabled={installCost === (quote.installation_cost || 0) || updateInstallCost.isPending}
+              style={{
+                padding: '0.5rem 1rem', border: 'none', borderRadius: 6, whiteSpace: 'nowrap',
+                background: installCost === (quote.installation_cost || 0) ? '#f3f4f6' : '#f97316',
+                color: installCost === (quote.installation_cost || 0) ? '#aaa' : '#fff',
+                fontSize: 13, fontWeight: 500,
+                cursor: installCost === (quote.installation_cost || 0) ? 'not-allowed' : 'pointer',
+              }}>
+              {updateInstallCost.isPending ? 'Guardando...' : 'Actualizar'}
+            </button>
+          </div>
+        </div>
+
+        {/* Desglose totales */}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: 13, color: '#666' }}>Subtotal productos</span>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>{formatCLP(quote.total - (quote.installation_cost || 0))}</span>
+          </div>
+          {(quote.installation_cost || 0) > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: 13, color: '#666', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Wrench size={12} color="#f97316" /> Instalación
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{formatCLP(quote.installation_cost)}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: '2px solid #111', fontWeight: 700, fontSize: 16 }}>
+            <span>Total</span>
+            <span>{formatCLP(quote.total)}</span>
+          </div>
         </div>
 
         <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1.25rem', fontSize: 13, color: '#15803d' }}>
@@ -228,8 +284,23 @@ function QuickOrderModal({ order, onClose }) {
           </tbody>
         </table>
 
-        <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 16, marginBottom: '1.25rem' }}>
-          Total: {formatCLP(order.total)}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: 13, color: '#666' }}>Subtotal productos</span>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>{formatCLP(order.subtotal)}</span>
+          </div>
+          {(order.installation_cost || 0) > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: 13, color: '#666', display: 'flex', alignItems: 'center', gap: 6 }}>
+                🔧 Instalación
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{formatCLP(order.installation_cost)}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: '2px solid #111', fontWeight: 700, fontSize: 16 }}>
+            <span>Total</span>
+            <span>{formatCLP(order.total)}</span>
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', justifyContent: 'flex-end' }}>
@@ -304,7 +375,7 @@ export default function DashboardPage() {
         <StatCard icon={Package}     label="Tasa de conversión"    value={`${conversionRate}%`}        sub="cotización → aprobada"                    color="#f97316" />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+      <div className="dash-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
 
         <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', overflow: 'hidden' }}>
           <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -317,7 +388,7 @@ export default function DashboardPage() {
               <p style={{ margin: 0, color: '#888', fontSize: 13 }}>Sin cotizaciones pendientes 🎉</p>
             </div>
           ) : pendingQuotes.slice(0, 5).map((q) => {
-            const wantsInstall = q.notes?.includes('--- Solicita instalación ---')
+            const wantsInstall = q.wants_installation
             return (
               <div key={q.id} style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid #f5f5f5', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -366,7 +437,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+      <div className="dash-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
         <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', overflow: 'hidden' }}>
           <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #eee' }}>
             <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Cotizaciones de {monthName}</h3>
@@ -410,6 +481,13 @@ export default function DashboardPage() {
 
       {quickQuote && <QuickQuoteModal quote={quickQuote} onClose={() => setQuickQuote(null)} />}
       {quickOrder && <QuickOrderModal order={quickOrder} onClose={() => setQuickOrder(null)} />}
+
+      <style>{`
+        @media (max-width: 767px) {
+          .dash-two-col    { grid-template-columns: 1fr !important; }
+          .dash-modal-box  { max-height: 95vh !important; border-radius: 12px 12px 0 0 !important; margin-top: auto; padding: 1.25rem !important; }
+        }
+      `}</style>
     </div>
   )
 }

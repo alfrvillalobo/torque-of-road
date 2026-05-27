@@ -1,6 +1,9 @@
 const pool = require('../../config/db')
 
 const QuoteRepository = {
+  // findAll ahora acepta page y limit para paginar resultados.
+  // Además hace un COUNT en paralelo para que el frontend sepa cuántas
+  // páginas existen sin hacer una segunda request.
   async findAll({ status, user_id, month, page = 1, limit = 20 } = {}) {
     const conditions = []
     const values = []
@@ -15,8 +18,11 @@ const QuoteRepository = {
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
+    // OFFSET indica cuántos registros saltarse: página 1 = 0, página 2 = 20, etc.
     const offset = (page - 1) * limit
 
+    // Ejecutamos el COUNT y la query de datos en paralelo para no hacer dos
+    // roundtrips secuenciales a la DB
     const [countResult, dataResult] = await Promise.all([
       pool.query(
         `SELECT COUNT(*) FROM quotes q ${where}`,
@@ -77,19 +83,21 @@ const QuoteRepository = {
     return rows[0] || null
   },
 
-  async create({ user_id, customer_name, customer_email, customer_phone, vehicle_make, vehicle_model, vehicle_year, notes, items }) {
+  async create({ user_id, customer_name, customer_email, customer_phone, vehicle_make, vehicle_model, vehicle_year, notes, wants_installation = false, items }) {
     const client = await pool.connect()
     try {
       await client.query('BEGIN')
 
-      const total = items.reduce((acc, item) => acc + (item.unit_price * item.quantity), 0)
+      const subtotal = items.reduce((acc, item) => acc + (item.unit_price * item.quantity), 0)
 
       const { rows } = await client.query(
         `INSERT INTO quotes (user_id, customer_name, customer_email, customer_phone,
-           vehicle_make, vehicle_model, vehicle_year, notes, total)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+           vehicle_make, vehicle_model, vehicle_year, notes, wants_installation,
+           installation_cost, total)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
         [user_id || null, customer_name, customer_email, customer_phone,
-         vehicle_make, vehicle_model, vehicle_year || null, notes || null, total]
+         vehicle_make, vehicle_model, vehicle_year || null, notes || null,
+         wants_installation, 0, subtotal]
       )
       const quote = rows[0]
 
@@ -116,6 +124,23 @@ const QuoteRepository = {
     const { rows } = await pool.query(
       `UPDATE quotes SET status = $1 WHERE id = $2 RETURNING *`,
       [status, id]
+    )
+    return rows[0] || null
+  },
+
+  // Actualiza el costo de instalación y recalcula el total
+  async updateInstallationCost(id, installationCost) {
+    const { rows } = await pool.query(
+      `UPDATE quotes
+       SET installation_cost = $1::integer,
+           total = (
+             SELECT COALESCE(SUM(subtotal), 0)
+             FROM quote_items
+             WHERE quote_id = $2
+           ) + $1::integer
+       WHERE id = $2
+       RETURNING *`,
+      [installationCost, id]
     )
     return rows[0] || null
   },

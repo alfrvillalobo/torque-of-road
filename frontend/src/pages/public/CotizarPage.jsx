@@ -22,24 +22,17 @@ export default function CotizarPage() {
   const { register, handleSubmit, formState: { errors } } = useForm()
 
   const submit = useMutation({
-    mutationFn: (data) => {
-      let notes = data.notes || ''
-      if (wantsInstall) {
-        notes += `\n\n--- Solicita instalación ---`
-        if (data.install_address) notes += `\nDirección: ${data.install_address}`
-        if (data.install_date) notes += `\nFecha preferida: ${data.install_date}`
-      }
-      return quoteService.create({
-        customer_name: data.name,
-        customer_email: data.email,
-        customer_phone: data.phone,
-        vehicle_make: data.vehicle_make,
-        vehicle_model: data.vehicle_model,
-        vehicle_year: data.vehicle_year ? parseInt(data.vehicle_year) : undefined,
-        notes: notes.trim(),
-        items: items.map((i) => ({ product_id: i.id, quantity: i.quantity })),
-      })
-    },
+    mutationFn: (data) => quoteService.create({
+      customer_name:      data.name,
+      customer_email:     data.email,
+      customer_phone:     data.phone,
+      vehicle_make:       data.vehicle_make,
+      vehicle_model:      data.vehicle_model,
+      vehicle_year:       data.vehicle_year ? parseInt(data.vehicle_year) : undefined,
+      wants_installation: wantsInstall,
+      notes:              data.notes?.trim() || undefined,
+      items:              items.map((i) => ({ product_id: i.id, quantity: i.quantity })),
+    }),
     onSuccess: () => {
       setUnavailableProducts([])
       clear()
@@ -179,19 +172,7 @@ export default function CotizarPage() {
             <p style={{ margin: '6px 0 0 26px', fontSize: 12, color: '#888' }}>
               Coordinamos la instalación con un técnico especializado. Se agrega al presupuesto.
             </p>
-            {wantsInstall && (
-              <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 4 }}>Dirección de instalación</label>
-                  <input {...register('install_address')} placeholder="Ej: Av. Principal 123, Santiago" style={inputStyle(false)} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 4 }}>Fecha preferida</label>
-                  <input type="date" {...register('install_date')}
-                    min={new Date().toISOString().split('T')[0]} style={inputStyle(false)} />
-                </div>
-              </div>
-            )}
+
           </div>
 
           <div>

@@ -44,12 +44,9 @@ const QuoteService = {
       }
     }
 
-    // Fix 3: una sola query trae todos los productos necesarios
-    // En lugar de hacer 1 query por producto (N+1), traemos todos de una vez
     const productIds = items.map((i) => i.product_id)
     const products   = await ProductRepository.findByIds(productIds)
 
-    // Indexar por id para lookup O(1)
     const productMap = {}
     for (const p of products) productMap[p.id] = p
 
@@ -94,6 +91,17 @@ const QuoteService = {
       err.status = 400; throw err
     }
     return QuoteRepository.updateStatus(id, status)
+  },
+
+  // Actualiza el costo de instalación — solo admin
+  async updateInstallationCost(id, installationCost) {
+    await this.getById(id)
+    const cost = parseInt(installationCost)
+    if (isNaN(cost) || cost < 0) {
+      const err = new Error('El costo de instalación debe ser un número positivo')
+      err.status = 400; throw err
+    }
+    return QuoteRepository.updateInstallationCost(id, cost)
   },
 }
 

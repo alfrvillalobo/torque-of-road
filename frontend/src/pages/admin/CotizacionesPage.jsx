@@ -27,6 +27,19 @@ const inp = (hasError = false) => ({
 
 function QuoteDetailModal({ quote, onClose }) {
   const qc = useQueryClient()
+  const [installCost, setInstallCost] = useState(quote.installation_cost || 0)
+
+  const updateInstallCost = useMutation({
+    mutationFn: () => quoteService.updateInstallationCost(quote.id, installCost),
+    onSuccess: (updatedQuote) => {
+      toast.success('Costo de instalación actualizado')
+      // Actualizar el objeto quote en memoria para reflejar el nuevo total inmediatamente
+      quote.installation_cost = updatedQuote.installation_cost
+      quote.total             = updatedQuote.total
+      qc.invalidateQueries({ queryKey: ['quotes'] })
+    },
+    onError: (e) => toast.error(e.response?.data?.error || 'Error al actualizar'),
+  })
 
   const updateStatus = useMutation({
     mutationFn: (status) => quoteService.updateStatus(quote.id, status),
@@ -34,28 +47,18 @@ function QuoteDetailModal({ quote, onClose }) {
     onError: (e) => toast.error(e.response?.data?.error || 'Error'),
   })
 
-  const convertToOrder = useMutation({
-    mutationFn: () => orderService.createFromQuote(quote.id, {
-      customer_name:  quote.customer_name,
-      customer_email: quote.customer_email,
-      customer_phone: quote.customer_phone,
-    }),
+  const approveAndConvert = useMutation({
+    mutationFn: () => quoteService.approveAndConvert(quote.id),
     onSuccess: () => {
-      toast.success('Pedido creado desde cotización')
+      toast.success('Cotización aprobada y pedido creado')
       qc.invalidateQueries({ queryKey: ['quotes'] })
       qc.invalidateQueries({ queryKey: ['orders'] })
       onClose()
     },
-    onError: (e) => toast.error(e.response?.data?.error || 'Error al convertir'),
+    onError: (e) => toast.error(e.response?.data?.error || 'Error al aprobar'),
   })
 
-  const wantsInstall = quote.notes?.includes('--- Solicita instalación ---')
-  const installLines = wantsInstall
-    ? quote.notes.split('--- Solicita instalación ---')[1]?.trim().split('\n').filter(Boolean)
-    : []
-  const cleanNotes = wantsInstall
-    ? quote.notes.split('\n\n--- Solicita instalación ---')[0]?.trim()
-    : quote.notes
+  const wantsInstall = quote.wants_installation
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
@@ -88,16 +91,14 @@ function QuoteDetailModal({ quote, onClose }) {
               <Wrench size={15} color="#f97316" />
               <span style={{ fontWeight: 600, fontSize: 14, color: '#c2410c' }}>El cliente solicita instalación</span>
             </div>
-            {installLines.map((line, i) => (
-              <p key={i} style={{ margin: '2px 0', fontSize: 13, color: '#92400e' }}>{line}</p>
-            ))}
+
           </div>
         )}
 
-        {cleanNotes && (
+        {quote.notes && (
           <div style={{ background: '#f8f8f6', borderRadius: 8, padding: '0.875rem 1rem', marginBottom: '1.25rem' }}>
             <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>Observaciones</p>
-            <p style={{ margin: 0, fontSize: 13, color: '#555', whiteSpace: 'pre-line' }}>{cleanNotes}</p>
+            <p style={{ margin: 0, fontSize: 13, color: '#555', whiteSpace: 'pre-line' }}>{quote.notes}</p>
           </div>
         )}
 
@@ -121,8 +122,64 @@ function QuoteDetailModal({ quote, onClose }) {
           </tbody>
         </table>
 
-        <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 17, marginBottom: '1.5rem' }}>
-          Total: {formatCLP(quote.total)}
+        {/* Subtotal productos */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+          <span style={{ fontSize: 14, color: '#666' }}>Subtotal productos</span>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>{formatCLP(quote.total - (quote.installation_cost || 0))}</span>
+        </div>
+
+        {/* Costo instalación — editable solo si la cotización está pendiente */}
+        {quote.status === 'pending' && (
+          <div style={{ background: '#f8f8f6', borderRadius: 8, padding: '0.875rem 1rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.625rem' }}>
+              <Wrench size={14} color="#f97316" />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>Costo de instalación</span>
+              {quote.wants_installation && (
+                <span style={{ background: '#fff7ed', color: '#c2410c', fontSize: 11, fontWeight: 500, padding: '1px 7px', borderRadius: 20, border: '1px solid #fed7aa' }}>
+                  Cliente lo solicitó
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#888' }}>$</span>
+                <input
+                  type="number" min="0"
+                  value={installCost}
+                  onChange={(e) => setInstallCost(Math.max(0, parseInt(e.target.value) || 0))}
+                  style={{ width: '100%', padding: '0.5rem 0.75rem 0.5rem 1.5rem', border: '1px solid #ddd', borderRadius: 6, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+              <button
+                onClick={() => updateInstallCost.mutate()}
+                disabled={installCost === (quote.installation_cost || 0) || updateInstallCost.isPending}
+                style={{
+                  padding: '0.5rem 1rem', border: 'none', borderRadius: 6, whiteSpace: 'nowrap',
+                  background: installCost === (quote.installation_cost || 0) ? '#f3f4f6' : '#f97316',
+                  color: installCost === (quote.installation_cost || 0) ? '#aaa' : '#fff',
+                  fontSize: 13, fontWeight: 500,
+                  cursor: installCost === (quote.installation_cost || 0) ? 'not-allowed' : 'pointer',
+                }}>
+                {updateInstallCost.isPending ? 'Guardando...' : 'Actualizar'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Si aprobada, mostrar costo de instalación como solo lectura */}
+        {quote.status === 'approved' && (quote.installation_cost || 0) > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+            <span style={{ fontSize: 14, color: '#666', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Wrench size={13} color="#f97316" /> Costo de instalación
+            </span>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>{formatCLP(quote.installation_cost)}</span>
+          </div>
+        )}
+
+        {/* Total final */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 17, marginBottom: '1.5rem', paddingTop: '0.5rem', borderTop: '2px solid #111' }}>
+          <span>Total</span>
+          <span>{formatCLP((quote.total - (quote.installation_cost || 0)) + installCost)}</span>
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
@@ -131,21 +188,15 @@ function QuoteDetailModal({ quote, onClose }) {
           </button>
           {quote.status === 'pending' && (
             <>
-              <button onClick={() => updateStatus.mutate('rejected')} disabled={updateStatus.isPending}
+              <button onClick={() => updateStatus.mutate('rejected')} disabled={updateStatus.isPending || approveAndConvert.isPending}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.6rem 1rem', border: 'none', borderRadius: 6, background: '#fef2f2', color: '#ef4444', fontSize: 14, cursor: 'pointer', fontWeight: 500 }}>
                 <XCircle size={15} /> Rechazar
               </button>
-              <button onClick={() => updateStatus.mutate('approved')} disabled={updateStatus.isPending}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.6rem 1rem', border: 'none', borderRadius: 6, background: '#dcfce7', color: '#166534', fontSize: 14, cursor: 'pointer', fontWeight: 500 }}>
-                <CheckCircle size={15} /> Aprobar
+              <button onClick={() => approveAndConvert.mutate()} disabled={updateStatus.isPending || approveAndConvert.isPending}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.6rem 1.25rem', border: 'none', borderRadius: 6, background: approveAndConvert.isPending ? '#86efac' : '#16a34a', color: '#fff', fontSize: 14, cursor: approveAndConvert.isPending ? 'not-allowed' : 'pointer', fontWeight: 600 }}>
+                <CheckCircle size={15} /> {approveAndConvert.isPending ? 'Procesando...' : 'Aprobar y crear pedido'}
               </button>
             </>
-          )}
-          {quote.status === 'approved' && (
-            <button onClick={() => convertToOrder.mutate()} disabled={convertToOrder.isPending}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.6rem 1.25rem', border: 'none', borderRadius: 6, background: '#f97316', color: '#fff', fontSize: 14, cursor: 'pointer', fontWeight: 500 }}>
-              <ArrowRight size={15} /> Convertir en pedido
-            </button>
           )}
         </div>
       </div>
@@ -162,7 +213,7 @@ function NewQuoteModal({ onClose }) {
   const [form, setForm] = useState({
     name: '', email: '', phone: '',
     vehicle_make: '', vehicle_model: '', vehicle_year: '',
-    install_address: '', install_date: '', notes: '',
+    notes: '',
   })
 
   const { data: result } = useQuery({
@@ -204,12 +255,7 @@ function NewQuoteModal({ onClose }) {
 
   const submit = useMutation({
     mutationFn: () => {
-      let notes = form.notes || ''
-      if (wantsInstall) {
-        notes += `\n\n--- Solicita instalación ---`
-        if (form.install_address) notes += `\nDirección: ${form.install_address}`
-        if (form.install_date)    notes += `\nFecha preferida: ${form.install_date}`
-      }
+      const notes = form.notes || ''
       return quoteService.create({
         customer_name:  form.name,
         customer_email: form.email,
@@ -217,7 +263,8 @@ function NewQuoteModal({ onClose }) {
         vehicle_make:   form.vehicle_make || undefined,
         vehicle_model:  form.vehicle_model || undefined,
         vehicle_year:   form.vehicle_year ? parseInt(form.vehicle_year) : undefined,
-        notes:          notes.trim() || undefined,
+        wants_installation: wantsInstall,
+        notes:              notes.trim() || undefined,
         items: cartItems.map((i) => ({ product_id: i.product.id, quantity: i.quantity })),
       })
     },
@@ -294,22 +341,10 @@ function NewQuoteModal({ onClose }) {
                   style={{ width: 15, height: 15, accentColor: '#f97316' }} />
                 <Wrench size={14} color={wantsInstall ? '#f97316' : '#888'} />
                 <span style={{ fontWeight: 600, fontSize: 13, color: wantsInstall ? '#c2410c' : '#333' }}>
-                  Incluir instalación en cotización
+                  Cotizar instalación  
                 </span>
               </label>
-              {wantsInstall && (
-                <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div>
-                    <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 4 }}>Dirección</label>
-                    <input value={form.install_address} onChange={set('install_address')} placeholder="Av. Principal 123..." style={inp()} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 4 }}>Fecha preferida</label>
-                    <input type="date" value={form.install_date} onChange={set('install_date')}
-                      min={new Date().toISOString().split('T')[0]} style={inp()} />
-                  </div>
-                </div>
-              )}
+
             </div>
 
             <div>
@@ -446,9 +481,9 @@ export default function CotizacionesPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+      <div className="cot-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Cotizaciones</h2>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+        <div className="cot-actions" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           <select value={statusFilter} onChange={(e) => handleStatusFilter(e.target.value)}
             style={{ padding: '0.6rem 0.75rem', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, background: '#fff', outline: 'none' }}>
             <option value="">Todos los estados</option>
@@ -466,7 +501,8 @@ export default function CotizacionesPage() {
         </div>
       </div>
 
-      <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', overflow: 'hidden' }}>
+      {/* Tabla desktop */}
+      <div className="cot-table-wrap" style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: '#f8f8f6', borderBottom: '1px solid #eee' }}>
@@ -481,7 +517,7 @@ export default function CotizacionesPage() {
             ) : quotes.length === 0 ? (
               <tr><td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: '#888' }}>No hay cotizaciones</td></tr>
             ) : quotes.map((q) => {
-              const wantsInstall = q.notes?.includes('--- Solicita instalación ---')
+              const wantsInstall = q.wants_installation
               return (
                 <tr key={q.id} style={{ borderBottom: '1px solid #f5f5f5' }}>
                   <td style={{ padding: '0.875rem 1rem', fontSize: 13, color: '#888' }}>#{q.id}</td>
@@ -523,6 +559,72 @@ export default function CotizacionesPage() {
         </table>
         <Pagination pagination={pagination} onPageChange={setPage} />
       </div>
+
+      {/* Cards móvil */}
+      <div className="cot-cards-wrap" style={{ display: 'none', flexDirection: 'column', gap: '0.75rem' }}>
+        {isLoading ? (
+          <p style={{ textAlign: 'center', color: '#888' }}>Cargando...</p>
+        ) : quotes.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#888' }}>No hay cotizaciones</p>
+        ) : quotes.map((q) => (
+          <div key={q.id} style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', padding: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+              <div>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>{q.customer_name}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: '#888' }}>{q.customer_email}</p>
+                {q.vehicle_make && (
+                  <p style={{ margin: '2px 0 0', fontSize: 12, color: '#f97316' }}>
+                    {q.vehicle_make} {q.vehicle_model} {q.vehicle_year || ''}
+                  </p>
+                )}
+              </div>
+              <span style={{ fontSize: 12, color: '#aaa' }}>#{q.id}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <StatusBadge status={q.status} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {q.wants_installation && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#fff7ed', color: '#c2410c', padding: '1px 6px', borderRadius: 20, fontSize: 11 }}>
+                      <Wrench size={10} /> Instalación
+                    </span>
+                  )}
+                  <span style={{ fontSize: 12, color: '#aaa' }}>{formatDateTime(q.created_at)}</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 15 }}>{formatCLP(q.total)}</span>
+                <button onClick={() => setSelected(q)}
+                  style={{ background: '#f97316', border: 'none', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', color: '#fff', fontSize: 13, fontWeight: 500 }}>
+                  Ver
+                </button>
+                <button onClick={() => handleDelete(q)}
+                  style={{ background: 'none', border: '1px solid #fecaca', borderRadius: 6, padding: '6px 8px', cursor: 'pointer', color: '#ef4444' }}>
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+        <Pagination pagination={pagination} onPageChange={setPage} />
+      </div>
+
+      <style>{`
+        @media (max-width: 767px) {
+          .cot-table-wrap  { display: none !important; }
+          .cot-cards-wrap  { display: flex !important; }
+          .cot-actions     { width: 100%; justify-content: space-between; }
+        }
+        /* Modales pantalla completa en móvil */
+        @media (max-width: 600px) {
+          [style*="maxWidth: 620"], [style*="maxWidth: 880"], [style*="maxWidth: 560"] {
+            max-width: 100% !important;
+            margin: 0 !important;
+            border-radius: 12px 12px 0 0 !important;
+            max-height: 95vh !important;
+          }
+        }
+      `}</style>
 
       {selected && <QuoteDetailModal quote={selected} onClose={() => setSelected(null)} />}
       {newModal  && <NewQuoteModal   onClose={() => setNewModal(false)} />}

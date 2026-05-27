@@ -26,6 +26,7 @@ export const categoryService = {
 }
 
 export const quoteService = {
+  // Retorna { data: [], pagination: { total, page, limit, totalPages } }
   getAll: (params) =>
     api.get('/quotes', { params }).then((r) => ({
       data:       r.data.data,
@@ -44,11 +45,15 @@ export const quoteService = {
   approveAndConvert: (id) =>
     api.post(`/quotes/${id}/approve-and-convert`).then((r) => r.data),
 
+  updateInstallationCost: (id, cost) =>
+    api.patch(`/quotes/${id}/installation-cost`, { installation_cost: cost }).then((r) => r.data.data),
+
   delete: (id) =>
     api.delete(`/quotes/${id}`).then((r) => r.data),
 }
 
 export const orderService = {
+  // Retorna { data: [], pagination: { total, page, limit, totalPages } }
   getAll: (params) =>
     api.get('/orders', { params }).then((r) => ({
       data:       r.data.data,

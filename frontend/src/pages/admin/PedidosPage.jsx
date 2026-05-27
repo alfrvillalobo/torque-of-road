@@ -18,6 +18,7 @@ function StatusBadge({ status }) {
 function OrderDetailModal({ order, onClose }) {
   const qc = useQueryClient()
   const [status, setStatus] = useState(order.status)
+  const isFinal = ['delivered', 'cancelled'].includes(order.status)
 
   const updateStatus = useMutation({
     mutationFn: () => orderService.updateStatus(order.id, status),
@@ -60,22 +61,46 @@ function OrderDetailModal({ order, onClose }) {
           </tbody>
         </table>
 
-        <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 16, marginBottom: '1.5rem' }}>
-          Total: {formatCLP(order.total)}
+        {/* Desglose subtotal + instalación + total */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: 14, color: '#666' }}>Subtotal productos</span>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>{formatCLP(order.subtotal)}</span>
+          </div>
+          {(order.installation_cost || 0) > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: 14, color: '#666', display: 'flex', alignItems: 'center', gap: 6 }}>
+                🔧 Instalación
+              </span>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>{formatCLP(order.installation_cost)}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '2px solid #111', fontWeight: 700, fontSize: 16 }}>
+            <span>Total</span>
+            <span>{formatCLP(order.total)}</span>
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', justifyContent: 'flex-end' }}>
           <button onClick={onClose} style={{ padding: '0.6rem 1rem', border: '1px solid #ddd', borderRadius: 6, background: '#fff', fontSize: 14, cursor: 'pointer' }}>
             Cerrar
           </button>
-          <select value={status} onChange={(e) => setStatus(e.target.value)}
-            style={{ padding: '0.6rem 0.75rem', border: '1px solid #ddd', borderRadius: 6, fontSize: 14, background: '#fff' }}>
-            {STATUSES.map((s) => <option key={s} value={s}>{getStatusLabel(s).label}</option>)}
-          </select>
-          <button onClick={() => updateStatus.mutate()} disabled={status === order.status}
-            style={{ padding: '0.6rem 1.25rem', border: 'none', borderRadius: 6, background: '#f97316', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
-            Actualizar
-          </button>
+          {!isFinal ? (
+            <>
+              <select value={status} onChange={(e) => setStatus(e.target.value)}
+                style={{ padding: '0.6rem 0.75rem', border: '1px solid #ddd', borderRadius: 6, fontSize: 14, background: '#fff' }}>
+                {STATUSES.map((s) => <option key={s} value={s}>{getStatusLabel(s).label}</option>)}
+              </select>
+              <button onClick={() => updateStatus.mutate()} disabled={status === order.status}
+                style={{ padding: '0.6rem 1.25rem', border: 'none', borderRadius: 6, background: '#f97316', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+                Actualizar
+              </button>
+            </>
+          ) : (
+            <span style={{ fontSize: 13, color: '#888', fontStyle: 'italic' }}>
+              Estado final — no se puede modificar
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -115,7 +140,8 @@ export default function PedidosPage() {
         </select>
       </div>
 
-      <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', overflow: 'hidden' }}>
+      {/* Tabla desktop */}
+      <div className="pedidos-table-wrap" style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: '#f8f8f6', borderBottom: '1px solid #eee' }}>
@@ -150,6 +176,52 @@ export default function PedidosPage() {
         </table>
         <Pagination pagination={pagination} onPageChange={setPage} />
       </div>
+
+      {/* Cards móvil */}
+      <div className="pedidos-cards-wrap" style={{ display: 'none', flexDirection: 'column', gap: '0.75rem' }}>
+        {isLoading ? (
+          <p style={{ textAlign: 'center', color: '#888' }}>Cargando...</p>
+        ) : orders.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#888' }}>No hay pedidos</p>
+        ) : orders.map((o) => (
+          <div key={o.id} style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', padding: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+              <div>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>{o.customer_name}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: '#888' }}>{o.customer_email}</p>
+              </div>
+              <span style={{ fontSize: 12, color: '#aaa' }}>#{o.id}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <StatusBadge status={o.status} />
+                <span style={{ fontSize: 12, color: '#aaa' }}>{formatDateTime(o.created_at)}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontWeight: 700, fontSize: 15 }}>{formatCLP(o.total)}</span>
+                <button onClick={() => setSelected(o)} style={{ background: '#f97316', border: 'none', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', color: '#fff', fontSize: 13, fontWeight: 500 }}>
+                  Ver
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+        <Pagination pagination={pagination} onPageChange={setPage} />
+      </div>
+
+      <style>{`
+        @media (max-width: 767px) {
+          .pedidos-table-wrap { display: none !important; }
+          .pedidos-cards-wrap { display: flex !important; }
+        }
+        @media (max-width: 600px) {
+          [style*="maxWidth: 560"] {
+            max-width: 100% !important;
+            border-radius: 12px 12px 0 0 !important;
+            max-height: 95vh !important;
+          }
+        }
+      `}</style>
 
       {selected && <OrderDetailModal order={selected} onClose={() => setSelected(null)} />}
     </div>

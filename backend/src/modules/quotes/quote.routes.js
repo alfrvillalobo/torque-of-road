@@ -15,6 +15,7 @@ const quoteLimiter = rateLimit({
   message: { success: false, error: 'Demasiadas solicitudes. Intenta de nuevo en una hora.' },
 })
 
+// GET /api/quotes?status=pending&month=2025-04&page=1&limit=20
 router.get('/', requireAuth, async (req, res, next) => {
   try {
     const page  = Math.max(1, parseInt(req.query.page)  || 1)
@@ -39,6 +40,7 @@ router.get('/:id', requireAuth, validateId, async (req, res, next) => {
   } catch (e) { next(e) }
 })
 
+// POST /api/quotes – público (sin login también)
 router.post('/', quoteLimiter, async (req, res, next) => {
   try {
     const data = { ...req.body, user_id: req.user?.id || null }
@@ -53,6 +55,7 @@ router.patch('/:id/status', requireAuth, requireAdmin, validateId, async (req, r
   } catch (e) { next(e) }
 })
 
+// Aprobar + crear pedido en una sola transacción PostgreSQL
 router.post('/:id/approve-and-convert', requireAuth, requireAdmin, validateId, async (req, res, next) => {
   const client = await pool.connect()
   try {
@@ -84,11 +87,14 @@ router.post('/:id/approve-and-convert', requireAuth, requireAdmin, validateId, a
 
     await client.query('UPDATE quotes SET status = $1 WHERE id = $2', ['approved', quoteId])
 
+    const subtotalProductos = quote.total - (quote.installation_cost || 0)
+
     const { rows: orderRows } = await client.query(
-      `INSERT INTO orders (user_id, quote_id, customer_name, customer_email, customer_phone, subtotal, total, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'pending') RETURNING *`,
+      `INSERT INTO orders (user_id, quote_id, customer_name, customer_email, customer_phone, subtotal, installation_cost, total, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending') RETURNING *`,
       [quote.user_id, quoteId, quote.customer_name, quote.customer_email,
-       quote.customer_phone || null, quote.total, quote.total]
+       quote.customer_phone || null, subtotalProductos,
+       quote.installation_cost || 0, quote.total]
     )
     const order = orderRows[0]
 
@@ -110,6 +116,15 @@ router.post('/:id/approve-and-convert', requireAuth, requireAdmin, validateId, a
   }
 })
 
+// Actualizar costo de instalación – solo admin
+router.patch('/:id/installation-cost', requireAuth, requireAdmin, validateId, async (req, res, next) => {
+  try {
+    const quote = await QuoteService.updateInstallationCost(req.params.id, req.body.installation_cost)
+    res.json({ success: true, data: quote })
+  } catch (e) { next(e) }
+})
+
+// Eliminar cotización – solo admin
 router.delete('/:id', requireAuth, requireAdmin, validateId, async (req, res, next) => {
   try {
     const { rows } = await pool.query('DELETE FROM quotes WHERE id = $1 RETURNING id', [req.params.id])

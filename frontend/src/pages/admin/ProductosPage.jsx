@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { Plus, Pencil, Trash2, X, Search, Upload, ImageOff } from 'lucide-react'
 import { useProducts, useCategories, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../../hooks/useProducts'
@@ -8,6 +9,7 @@ import { useAuthStore } from '../../context/authStore'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
+// ── Componente de subida de imágenes ──────────────────────────
 function ImageUploader({ productId, existingImages = [], onImagesChange }) {
   const [uploading, setUploading] = useState(false)
   const [images, setImages]       = useState(existingImages)
@@ -17,6 +19,7 @@ function ImageUploader({ productId, existingImages = [], onImagesChange }) {
     const file = e.target.files[0]
     if (!file) return
 
+    // Preview local inmediata mientras sube
     const localUrl = URL.createObjectURL(file)
     const tempId   = 'temp-' + Date.now()
     const preview  = { id: tempId, url: localUrl, uploading: true }
@@ -32,6 +35,7 @@ function ImageUploader({ productId, existingImages = [], onImagesChange }) {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
 
+      // Reemplazar preview temporal con la URL real de Cloudinary
       const final = updated.map((img) =>
         img.id === tempId ? { ...res.data.data, uploading: false } : img
       )
@@ -39,6 +43,7 @@ function ImageUploader({ productId, existingImages = [], onImagesChange }) {
       onImagesChange?.(final)
       toast.success('Imagen subida')
     } catch (err) {
+      // Quitar la preview si falla
       setImages(images)
       toast.error(err.response?.data?.error || 'Error al subir imagen')
     } finally {
@@ -66,6 +71,7 @@ function ImageUploader({ productId, existingImages = [], onImagesChange }) {
         Imágenes del producto
       </label>
 
+      {/* Grid de imágenes actuales */}
       {images.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
           {images.map((img) => (
@@ -109,6 +115,7 @@ function ImageUploader({ productId, existingImages = [], onImagesChange }) {
         </div>
       )}
 
+      {/* Botón de subida */}
       <input
         ref={fileRef}
         type="file"
@@ -138,17 +145,37 @@ function ImageUploader({ productId, existingImages = [], onImagesChange }) {
   )
 }
 
+// ── Modal de formulario ────────────────────────────────────────
 function ProductModal({ product, categories, onClose }) {
   const { register, handleSubmit, formState: { errors } } = useForm({
     defaultValues: product || { stock_status: 'bajo_pedido', is_active: true },
   })
-  const create     = useCreateProduct()
-  const update     = useUpdateProduct()
-  const isPending  = create.isPending || update.isPending
+  const create    = useCreateProduct()
+  const update    = useUpdateProduct()
+  const isPending = create.isPending || update.isPending
   const [savedId, setSavedId] = useState(product?.id || null)
+  const qc = useQueryClient()
+
+  // Al cerrar tras subir imágenes, forzamos recarga de la lista
+  const handleClose = () => {
+    if (savedId) qc.invalidateQueries({ queryKey: ['products'] })
+    onClose()
+  }
+
+  // Categorías seleccionadas como array de IDs
+  const [selectedCategories, setSelectedCategories] = useState(
+    product?.categories?.map((c) => c.id) ?? []
+  )
+  const toggleCategory = (id) => {
+    setSelectedCategories((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    )
+  }
 
   const onSubmit = async (data) => {
-    const payload = { ...data, price: parseInt(data.price) }
+    const payload = { ...data, price: parseInt(data.price), category_ids: selectedCategories }
+    // Quitar el campo category legacy si viene
+    delete payload.category
     if (product) {
       update.mutate({ id: product.id, data: payload }, { onSuccess: onClose })
     } else {
@@ -180,11 +207,12 @@ function ProductModal({ product, categories, onClose }) {
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>
             {product ? 'Editar producto' : savedId ? 'Agregar imágenes' : 'Nuevo producto'}
           </h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}>
+          <button onClick={savedId ? handleClose : onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}>
             <X size={20} />
           </button>
         </div>
 
+        {/* Si el producto ya fue creado, mostrar uploader de imágenes */}
         {savedId && !product ? (
           <div>
             <p style={{ fontSize: 14, color: '#666', marginBottom: '1rem' }}>
@@ -192,7 +220,7 @@ function ProductModal({ product, categories, onClose }) {
             </p>
             <ImageUploader productId={savedId} />
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-              <button onClick={onClose} style={{
+              <button onClick={handleClose} style={{
                 padding: '0.6rem 1.25rem', border: 'none', borderRadius: 6,
                 background: '#f97316', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer',
               }}>
@@ -202,16 +230,10 @@ function ProductModal({ product, categories, onClose }) {
           </div>
         ) : (
           <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 4 }}>Nombre *</label>
-                <input {...register('name', { required: 'Requerido' })} style={inputStyle(errors.name)} />
-                {errors.name && <p style={{ color: '#ef4444', fontSize: 12, marginTop: 2 }}>{errors.name.message}</p>}
-              </div>
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 4 }}>SKU</label>
-                <input {...register('sku')} style={inputStyle(false)} placeholder="TOR-001" />
-              </div>
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 4 }}>Nombre *</label>
+              <input {...register('name', { required: 'Requerido' })} style={inputStyle(errors.name)} />
+              {errors.name && <p style={{ color: '#ef4444', fontSize: 12, marginTop: 2 }}>{errors.name.message}</p>}
             </div>
 
             <div>
@@ -234,26 +256,45 @@ function ProductModal({ product, categories, onClose }) {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 4 }}>Categoría</label>
-                <select {...register('category')} style={{ ...inputStyle(false), background: '#fff' }}>
-                  <option value="">Sin categoría</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.slug}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 4 }}>Disponibilidad</label>
-                <select {...register('stock_status')} style={{ ...inputStyle(false), background: '#fff' }}>
-                  <option value="bajo_pedido">Bajo pedido</option>
-                  <option value="disponible">Disponible</option>
-                  <option value="sin_stock">Sin stock</option>
-                </select>
-              </div>
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 6 }}>Categorías</label>
+              {categories.length === 0 ? (
+                <p style={{ fontSize: 13, color: '#aaa' }}>No hay categorías creadas aún</p>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {categories.map((c) => {
+                    const selected = selectedCategories.includes(c.id)
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => toggleCategory(c.id)}
+                        style={{
+                          padding: '5px 12px', borderRadius: 20, fontSize: 13, cursor: 'pointer',
+                          border: `1px solid ${selected ? '#f97316' : '#ddd'}`,
+                          background: selected ? '#fff7ed' : '#fff',
+                          color: selected ? '#c2410c' : '#555',
+                          fontWeight: selected ? 600 : 400,
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {c.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 4 }}>Disponibilidad</label>
+              <select {...register('stock_status')} style={{ ...inputStyle(false), background: '#fff' }}>
+                <option value="bajo_pedido">Bajo pedido</option>
+                <option value="disponible">Disponible</option>
+              </select>
+            </div>
+
+            {/* Imágenes — solo visible al editar (el producto ya tiene id) */}
             {product && (
               <ImageUploader
                 productId={product.id}
@@ -290,6 +331,7 @@ function ProductModal({ product, categories, onClose }) {
   )
 }
 
+// ── Página principal ───────────────────────────────────────────
 export default function ProductosPage() {
   const [search, setSearch]                 = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
@@ -306,9 +348,8 @@ export default function ProductosPage() {
   })
   const products   = result?.data       ?? []
   const pagination = result?.pagination ?? null
-
-  const { data: categories = [] } = useCategories()
-  const deleteProduct             = useDeleteProduct()
+  const { data: categories = [] }          = useCategories()
+  const deleteProduct                      = useDeleteProduct()
 
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -327,6 +368,7 @@ export default function ProductosPage() {
 
   return (
     <div>
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Productos</h2>
         <button onClick={handleNew} style={{
@@ -339,6 +381,7 @@ export default function ProductosPage() {
         </button>
       </div>
 
+      {/* Filtros */}
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
         <div style={{ position: 'relative', flex: 1 }}>
           <Search size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#aaa' }} />
@@ -353,6 +396,7 @@ export default function ProductosPage() {
         </select>
       </div>
 
+      {/* Tabla */}
       <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
@@ -371,6 +415,7 @@ export default function ProductosPage() {
               <tr key={p.id} style={{ borderBottom: '1px solid #f5f5f5' }}>
                 <td style={{ padding: '0.875rem 1rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {/* Miniatura */}
                     <div style={{ width: 44, height: 44, borderRadius: 6, overflow: 'hidden', border: '1px solid #eee', flexShrink: 0, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {p.main_image
                         ? <img src={p.main_image} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -384,7 +429,13 @@ export default function ProductosPage() {
                   </div>
                 </td>
                 <td style={{ padding: '0.875rem 1rem', fontSize: 13, color: '#666' }}>{p.sku || '-'}</td>
-                <td style={{ padding: '0.875rem 1rem', fontSize: 13, color: '#666' }}>{p.category || '-'}</td>
+                <td style={{ padding: '0.875rem 1rem', fontSize: 13, color: '#666' }}>
+                  {p.categories?.length > 0
+                    ? p.categories.map((c) => (
+                        <span key={c.id} style={{ display: 'inline-block', background: '#f3f4f6', borderRadius: 20, padding: '1px 8px', fontSize: 11, marginRight: 4 }}>{c.name}</span>
+                      ))
+                    : '-'}
+                </td>
                 <td style={{ padding: '0.875rem 1rem', fontSize: 14, fontWeight: 600 }}>{formatCLP(p.price)}</td>
                 <td style={{ padding: '0.875rem 1rem' }}>
                   <span style={{
@@ -392,7 +443,7 @@ export default function ProductosPage() {
                     background: p.stock_status === 'disponible' ? '#dcfce7' : '#fef3c7',
                     color: p.stock_status === 'disponible' ? '#166534' : '#92400e',
                   }}>
-                    {p.stock_status === 'disponible' ? 'Disponible' : p.stock_status === 'sin_stock' ? 'Sin stock' : 'Bajo pedido'}
+                    {p.stock_status === 'disponible' ? 'Disponible' : 'Bajo pedido'}
                   </span>
                 </td>
                 <td style={{ padding: '0.875rem 1rem' }}>
@@ -411,6 +462,56 @@ export default function ProductosPage() {
         </table>
         <Pagination pagination={pagination} onPageChange={setPage} />
       </div>
+
+      {/* Cards móvil */}
+      <div className="prod-cards-wrap" style={{ display: 'none', flexDirection: 'column', gap: '0.75rem' }}>
+        {isLoading ? (
+          <p style={{ textAlign: 'center', color: '#888' }}>Cargando...</p>
+        ) : filtered.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#888' }}>No hay productos</p>
+        ) : filtered.map((p) => (
+          <div key={p.id} style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', padding: '1rem', display: 'flex', gap: '0.875rem', alignItems: 'flex-start' }}>
+            <div style={{ width: 60, height: 60, background: '#f8f8f6', borderRadius: 8, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {p.main_image
+                ? <img src={p.main_image} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <span style={{ fontSize: 10, color: '#ccc' }}>Sin img</span>}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ margin: '0 0 2px', fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</p>
+              <p style={{ margin: '0 0 4px', fontSize: 11, color: '#aaa' }}>{p.sku}</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+                {p.categories?.map((c) => (
+                  <span key={c.id} style={{ background: '#f3f4f6', borderRadius: 20, padding: '1px 7px', fontSize: 11 }}>{c.name}</span>
+                ))}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>{formatCLP(p.price)}</span>
+                  <span style={{ background: p.stock_status === 'disponible' ? '#dcfce7' : '#fff7ed', color: p.stock_status === 'disponible' ? '#166534' : '#c2410c', fontSize: 11, padding: '1px 7px', borderRadius: 20 }}>
+                    {p.stock_status === 'disponible' ? 'Disponible' : 'Bajo pedido'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => handleEdit(p)} style={{ background: 'none', border: '1px solid #ddd', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: '#555' }}>
+                    <Pencil size={13} />
+                  </button>
+                  <button onClick={() => handleDelete(p.id)} style={{ background: 'none', border: '1px solid #fecaca', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: '#ef4444' }}>
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+        <Pagination pagination={pagination} onPageChange={setPage} />
+      </div>
+
+      <style>{`
+        @media (max-width: 767px) {
+          .prod-table-wrap { display: none !important; }
+          .prod-cards-wrap { display: flex !important; }
+        }
+      `}</style>
 
       {modalOpen && (
         <ProductModal product={editing} categories={categories} onClose={handleClose} />

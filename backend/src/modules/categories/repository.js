@@ -3,9 +3,10 @@ const pool = require('../../config/db')
 const CategoryRepository = {
   async findAll() {
     const { rows } = await pool.query(`
-      SELECT c.*, COUNT(p.id)::int AS product_count
+      SELECT c.*, COUNT(pc.product_id)::int AS product_count
       FROM categories c
-      LEFT JOIN products p ON p.category = c.slug AND p.is_active = true
+      LEFT JOIN product_categories pc ON pc.category_id = c.id
+      LEFT JOIN products p ON p.id = pc.product_id AND p.is_active = true
       GROUP BY c.id
       ORDER BY c.name ASC
     `)
@@ -13,25 +14,18 @@ const CategoryRepository = {
   },
 
   async findById(id) {
-    const { rows } = await pool.query(
-      'SELECT * FROM categories WHERE id = $1',
-      [id]
-    )
+    const { rows } = await pool.query('SELECT * FROM categories WHERE id = $1', [id])
     return rows[0] || null
   },
 
   async findBySlug(slug) {
-    const { rows } = await pool.query(
-      'SELECT * FROM categories WHERE slug = $1',
-      [slug]
-    )
+    const { rows } = await pool.query('SELECT * FROM categories WHERE slug = $1', [slug])
     return rows[0] || null
   },
 
   async create({ name, slug, description }) {
     const { rows } = await pool.query(
-      `INSERT INTO categories (name, slug, description)
-       VALUES ($1, $2, $3) RETURNING *`,
+      `INSERT INTO categories (name, slug, description) VALUES ($1, $2, $3) RETURNING *`,
       [name, slug, description || null]
     )
     return rows[0]
@@ -54,10 +48,7 @@ const CategoryRepository = {
   },
 
   async delete(id) {
-    const { rows } = await pool.query(
-      'DELETE FROM categories WHERE id = $1 RETURNING id',
-      [id]
-    )
+    const { rows } = await pool.query('DELETE FROM categories WHERE id = $1 RETURNING id', [id])
     return rows.length > 0
   },
 

@@ -397,7 +397,7 @@ export default function ProductosPage() {
       </div>
 
       {/* Tabla */}
-      <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', overflow: 'hidden' }}>
+      <div className="prod-table-wrap" style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: '#f8f8f6', borderBottom: '1px solid #eee' }}>

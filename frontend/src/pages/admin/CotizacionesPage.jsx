@@ -283,7 +283,7 @@ function NewQuoteModal({ onClose }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-      <div style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 880, maxHeight: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="nqm-container" style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 880, maxHeight: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 1.75rem', borderBottom: '1px solid #eee', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -293,7 +293,7 @@ function NewQuoteModal({ onClose }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}><X size={20} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', flex: 1, overflow: 'hidden' }}>
+        <form onSubmit={handleSubmit} className="nqm-form" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', flex: 1, overflow: 'hidden' }}>
 
           <div style={{ padding: '1.5rem 1.75rem', borderRight: '1px solid #eee', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
@@ -305,7 +305,7 @@ function NewQuoteModal({ onClose }) {
               {errors.name && <p style={{ color: '#ef4444', fontSize: 12, marginTop: 2 }}>{errors.name}</p>}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div className="nqm-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 4 }}>Teléfono *</label>
                 <input value={form.phone} onChange={set('phone')} placeholder="+56 9 ..." style={inp(errors.phone)} />
@@ -320,7 +320,7 @@ function NewQuoteModal({ onClose }) {
 
             <p style={{ margin: '0.25rem 0 0', fontSize: 12, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>Vehículo</p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', gap: '0.75rem' }}>
+            <div className="nqm-vehicle-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', gap: '0.75rem' }}>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 4 }}>Marca</label>
                 <input value={form.vehicle_make} onChange={set('vehicle_make')} placeholder="Toyota..." style={inp()} />
@@ -365,7 +365,7 @@ function NewQuoteModal({ onClose }) {
                 style={{ ...inp(), paddingLeft: '2rem' }} />
             </div>
 
-            <div style={{ border: '1px solid #eee', borderRadius: 8, maxHeight: 210, overflowY: 'auto' }}>
+            <div className="nqm-product-list" style={{ border: '1px solid #eee', borderRadius: 8, maxHeight: 210, overflowY: 'auto' }}>
               {filtered.length === 0 ? (
                 <p style={{ padding: '1rem', color: '#888', fontSize: 13, textAlign: 'center' }}>No hay productos</p>
               ) : filtered.map((p) => (
@@ -385,7 +385,7 @@ function NewQuoteModal({ onClose }) {
               ))}
             </div>
 
-            <div>
+            <div className="nqm-selected-section">
               <p style={{ margin: '0 0 6px', fontSize: 13, fontWeight: 600, color: '#333' }}>
                 Seleccionados {cartItems.length > 0 && `(${cartItems.length})`}
               </p>
@@ -568,34 +568,37 @@ export default function CotizacionesPage() {
           <p style={{ textAlign: 'center', color: '#888' }}>No hay cotizaciones</p>
         ) : quotes.map((q) => (
           <div key={q.id} style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', padding: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-              <div>
+            {/* Fila superior: datos cliente */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>{q.customer_name}</p>
-                <p style={{ margin: '2px 0 0', fontSize: 12, color: '#888' }}>{q.customer_email}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.customer_email}</p>
                 {q.vehicle_make && (
                   <p style={{ margin: '2px 0 0', fontSize: 12, color: '#f97316' }}>
                     {q.vehicle_make} {q.vehicle_model} {q.vehicle_year || ''}
                   </p>
                 )}
               </div>
-              <span style={{ fontSize: 12, color: '#aaa' }}>#{q.id}</span>
+              <span style={{ fontSize: 12, color: '#aaa', flexShrink: 0, marginLeft: 8 }}>#{q.id}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+
+            {/* Fila inferior: estado+fecha | total+acciones */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f5f5f5', paddingTop: '0.625rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <StatusBadge status={q.status} />
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <StatusBadge status={q.status} />
                   {q.wants_installation && (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#fff7ed', color: '#c2410c', padding: '1px 6px', borderRadius: 20, fontSize: 11 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#fff7ed', color: '#c2410c', padding: '1px 6px', borderRadius: 20, fontSize: 11, fontWeight: 500 }}>
                       <Wrench size={10} /> Instalación
                     </span>
                   )}
-                  <span style={{ fontSize: 12, color: '#aaa' }}>{formatDateTime(q.created_at)}</span>
                 </div>
+                <span style={{ fontSize: 11, color: '#aaa' }}>{formatDateTime(q.created_at)}</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                 <span style={{ fontWeight: 700, fontSize: 15 }}>{formatCLP(q.total)}</span>
                 <button onClick={() => setSelected(q)}
-                  style={{ background: '#f97316', border: 'none', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', color: '#fff', fontSize: 13, fontWeight: 500 }}>
+                  style={{ background: '#f97316', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', color: '#fff', fontSize: 13, fontWeight: 500 }}>
                   Ver
                 </button>
                 <button onClick={() => handleDelete(q)}
@@ -614,6 +617,16 @@ export default function CotizacionesPage() {
           .cot-table-wrap  { display: none !important; }
           .cot-cards-wrap  { display: flex !important; }
           .cot-actions     { width: 100%; justify-content: space-between; }
+
+          /* Modal nueva cotización */
+          .nqm-container   { max-width: 100% !important; max-height: 100vh !important; border-radius: 0 !important; }
+          .nqm-form        { grid-template-columns: 1fr !important; overflow-y: auto !important; }
+          .nqm-left        { border-right: none !important; border-bottom: 1px solid #eee; overflow-y: visible !important; padding: 1.25rem !important; }
+          .nqm-right            { overflow-y: auto !important; padding: 1.25rem !important; max-height: 50vh; }
+          .nqm-product-list     { max-height: 150px !important; }
+          .nqm-selected-section { max-height: 200px; overflow-y: auto; }
+          .nqm-two-col     { grid-template-columns: 1fr 1fr !important; }
+          .nqm-vehicle-col { grid-template-columns: 1fr 1fr !important; }
         }
         /* Modales pantalla completa en móvil */
         @media (max-width: 600px) {

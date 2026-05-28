@@ -368,7 +368,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '1rem' }}>
+      <div className="dash-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '1rem' }}>
         <StatCard icon={FileText}    label="Cotizaciones este mes" value={quotesThisMonth.length}      sub={`${pendingQuotes.length} pendientes`}    color="#3b82f6" to="/admin/cotizaciones" />
         <StatCard icon={ShoppingBag} label="Pedidos este mes"      value={ordersThisMonth.length}      sub={`${activeFiltered.length} en proceso`}   color="#a855f7" to="/admin/pedidos" />
         <StatCard icon={TrendingUp}  label="Ingresos este mes"     value={formatCLP(revenueThisMonth)} sub="pedidos entregados"                       color="#22c55e" />
@@ -484,8 +484,12 @@ export default function DashboardPage() {
 
       <style>{`
         @media (max-width: 767px) {
+          .dash-stats-grid { grid-template-columns: 1fr 1fr !important; }
           .dash-two-col    { grid-template-columns: 1fr !important; }
           .dash-modal-box  { max-height: 95vh !important; border-radius: 12px 12px 0 0 !important; margin-top: auto; padding: 1.25rem !important; }
+        }
+        @media (max-width: 480px) {
+          .dash-stats-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
     </div>
